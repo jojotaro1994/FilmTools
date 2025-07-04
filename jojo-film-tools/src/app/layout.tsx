@@ -5,7 +5,7 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Jojo Film Tools",
+  title: " Film Tools",
   description: "A tool for script analysis and storyboarding.",
 };
 

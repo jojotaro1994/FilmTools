@@ -1,7 +1,7 @@
-Reference: https://tools.youny.tv/
+ojo Film Tools
+Welcome to Film Tools! This is a web-based application built with Next.js and Tailwind CSS, designed to help screenwriters and directors visually plan their projects. It provides a powerful interface for script analysis, emotion tracking, and storyboard creation.
 
-Jojo Film Tools
-Welcome to Jojo Film Tools! This is a web-based application built with Next.js and Tailwind CSS, designed to help screenwriters and directors visually plan their projects. It provides a powerful interface for script analysis, emotion tracking, and storyboard creation.
+Note: This project is a functional clone and learning exercise based on the excellent tool created by Jalex Rosa, which can be found at https://tools.youny.tv/. A big thank you to the original author for the inspiration!
 
 Features
 Table & Analysis View: A detailed table for your script segments.
@@ -41,7 +41,7 @@ Clone the repository or download the source code.
 
 Navigate to the project directory in your terminal:
 
-cd path/to/your/jojo-film-tools
+cd path/to/your/film-tools
 
 Install the project dependencies:
 

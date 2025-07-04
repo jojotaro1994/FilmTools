@@ -310,7 +310,7 @@ export default function App() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = 'jojo-film-tools-data.json';
+        a.download = 'film-tools-data.json';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
@@ -344,7 +344,7 @@ export default function App() {
 
     return (
         <div className="bg-gray-900 text-gray-200 min-h-screen font-sans">
-            <header className="py-6 px-4 sm:px-6 lg:px-8"><div className="text-center"><h1 className="text-4xl font-bold text-amber-400" style={{fontFamily: "'Brush Script MT', cursive"}}>Jojo Film Tools</h1></div></header>
+            <header className="py-6 px-4 sm:px-6 lg:px-8"><div className="text-center"><h1 className="text-4xl font-bold text-amber-400" style={{fontFamily: "'Brush Script MT', cursive"}}> Film Tools</h1></div></header>
             <main className="px-4 sm:px-6 lg:px-8 pb-12">
                 <div className="max-w-7xl mx-auto">
                     <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
