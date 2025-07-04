@@ -30,9 +30,9 @@ Getting Started
 Follow these steps to get the project running on your local machine.
 
 Prerequisites
-Node.js (version 20.x or newer recommended)
+Node.js: You must have Node.js installed on your system. Version 20.x or newer is recommended. You can download and install it from the official Node.js website.
 
-A package manager like npm or yarn
+A package manager: npm is included with Node.js. You can also use yarn or pnpm.
 
 Installation & Setup
 Clone the repository or download the source code.
