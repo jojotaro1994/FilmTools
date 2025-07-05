@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { FileUp, Settings, Copy, X, Plus, Trash2, LayoutGrid, List, Crop, Upload, Download, RefreshCw, AlertTriangle, CornerDownLeft, ArrowRight } from 'lucide-react';
+import { FileUp, Settings, Copy, X, Plus, Trash2, LayoutGrid, List, Crop, Upload, Download, RefreshCw, AlertTriangle, CornerDownLeft, ArrowRight, Workflow as WorkflowIcon } from 'lucide-react';
 
 // --- Initial Data & Helpers ---
 const createInitialData = () => ({
@@ -165,10 +165,20 @@ const TableView = ({ scriptData, emotionColumns, showOverlay, onScriptChange, on
                         {scriptData.map((row, index) => (
                             <tr key={row.id} data-id={row.id} className="group hover:bg-gray-700/50 transition-colors">
                                 <td className="px-6 py-4 text-gray-300">
-                                    <div className="flex items-center">
-                                        <span className="font-mono text-gray-500 mr-4 w-16 text-right" style={{ paddingLeft: `${row.level * 1}rem` }}>{segmentNumbers[row.id]}</span>
-                                        <EditableSegment value={row.segment} onChange={newText => onScriptChange(row.id, 'segment', newText)} />
-                                        <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity ml-4">
+                                    <div className="flex items-start">
+                                        <span 
+                                            className="font-mono text-gray-500 mr-4 flex-shrink-0 whitespace-nowrap" 
+                                            style={{ paddingLeft: `${row.level * 1}rem` }}
+                                        >
+                                            {segmentNumbers[row.id]}
+                                        </span>
+                                        <div className="flex-grow min-w-0">
+                                            <EditableSegment 
+                                                value={row.segment} 
+                                                onChange={newText => onScriptChange(row.id, 'segment', newText)} 
+                                            />
+                                        </div>
+                                        <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity ml-4 flex-shrink-0">
                                             <button onClick={() => onScriptChange(row.id, 'add')} className="p-1 hover:bg-gray-600 rounded" title="Add Row Below"><Plus size={16} /></button>
                                             <button disabled={index === 0} onClick={() => onScriptChange(row.id, 'indent')} className="p-1 hover:bg-gray-600 rounded disabled:opacity-20 disabled:cursor-not-allowed" title="Indent"><ArrowRight size={16} /></button>
                                             <button disabled={row.level === 0} onClick={() => onScriptChange(row.id, 'outdent')} className="p-1 hover:bg-gray-600 rounded disabled:opacity-20 disabled:cursor-not-allowed" title="Outdent"><CornerDownLeft size={16} /></button>
@@ -211,6 +221,95 @@ const EmotionTimelineChart = ({ data, columns }) => {
     const segmentNumbers = generateSegmentNumbers(data);
     const xScale = (i) => padding.left + (i / (data.length - 1)) * chartWidth, yScale = (v) => padding.top + chartHeight - (v / 10) * chartHeight;
     return (<div className="bg-gray-800 border border-gray-700 rounded-lg shadow-lg mt-8"><div className="p-6"><h2 className="text-xl font-semibold text-white">Emotion Timeline</h2><p className="text-gray-400 mt-1">Visual representation of how emotions change.</p></div><div className="p-6"><svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto"><g className="text-gray-500 text-xs">{[0, 2, 4, 6, 8, 10].map(v => (<g key={`y-${v}`}><line x1={padding.left} y1={yScale(v)} x2={width-padding.right} y2={yScale(v)} stroke="currentColor" strokeWidth="0.5" strokeDasharray="2,2" /><text x={padding.left-8} y={yScale(v)} dy="0.32em" textAnchor="end">{v}</text></g>))}<text transform={`translate(${padding.left-30}, ${padding.top+chartHeight/2}) rotate(-90)`} textAnchor="middle" className="fill-current text-gray-400 text-sm">Intensity</text></g><g className="text-gray-500 text-xs"><line x1={padding.left} y1={yScale(0)} x2={width-padding.right} y2={yScale(0)} stroke="currentColor" strokeWidth="0.5" />{data.map((d, i) => (<text key={`x-${i}`} x={xScale(i)} y={height-padding.bottom+20} textAnchor="middle">{segmentNumbers[d.id]}</text>))}<text x={padding.left+chartWidth/2} y={height-5} textAnchor="middle" className="fill-current text-gray-400 text-sm">Script Segments</text></g>{columns.map(c => (<polyline key={`l-${c.key}`} fill="none" stroke={c.color} strokeWidth="2" points={data.map((d, i) => `${xScale(i)},${yScale(d[c.key])}`).join(' ')} />))}{columns.map(c => (<g key={`p-${c.key}`}>{data.map((d, i) => (<circle key={`p-${c.key}-${i}`} cx={xScale(i)} cy={yScale(d[c.key])} r="4" fill={c.color}><title>{`${c.label}: ${d[c.key]}`}</title></circle>))}</g>))}</svg><div className="flex justify-center items-center space-x-6 mt-4 flex-wrap">{columns.map(c => (<div key={`lg-${c.key}`} className="flex items-center space-x-2 text-sm mb-2"><span className="w-3 h-3 rounded-full" style={{ backgroundColor: c.color }}></span><span className="text-gray-300">{c.label}</span></div>))}</div></div></div>);
+};
+
+// --- NEW: Workflow View Component ---
+const WorkflowView = () => {
+    // This component renders the static workflow chart.
+    const workflowStyles = `
+        .stage-container { display: flex; flex-direction: column; gap: 1.5rem; }
+        .stage { background-color: #2a2a2e; border-radius: 12px; padding: 1.5rem; border: 1px solid #444; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
+        .stage-title { font-size: 1.5rem; font-weight: 700; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem; }
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+        .card { background-color: #38383d; border-radius: 8px; padding: 1rem; border-left: 4px solid; }
+        .card-title { font-weight: 500; font-size: 1rem; color: #ffffff; margin-bottom: 0.25rem; }
+        .card-description { font-size: 0.875rem; color: #b0b0b0; }
+        .arrow { text-align: center; font-size: 2.5rem; color: #666; margin: 0.5rem 0; }
+        .icon { width: 28px; height: 28px; }
+        .loop-icon { animation: spin 8s linear infinite; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    `;
+
+    return (
+        <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-lg overflow-hidden">
+            <style>{workflowStyles}</style>
+            <div className="p-6">
+                <header className="text-center mb-12">
+                    <h1 className="text-3xl md:text-4xl font-bold text-white">Personal Animation Workflow</h1>
+                    <p className="text-lg text-gray-400 mt-2">A flexible and iterative visual guide for solo creators.</p>
+                </header>
+                <div className="stage-container">
+                    {/* Stage 0: Project Foundation */}
+                    <div className="stage">
+                        <h2 className="stage-title" style={{ color: '#3b82f6' }}>
+                            <svg className="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h6.375a.625.625 0 0 1 .625.625v3.75a.625.625 0 0 1-.625.625H9v-5Zm0 6.25h6.375a.625.625 0 0 1 .625.625v3.75a.625.625 0 0 1-.625.625H9v-5Z" /></svg>
+                            0. Project Foundation
+                        </h2>
+                        <div className="card-grid">
+                            <div className="card" style={{ borderColor: '#3b82f6' }}><h3 className="card-title">Project Initialization</h3><p className="card-description">Set up clear folder structure & version control.</p></div>
+                            <div className="card" style={{ borderColor: '#3b82f6' }}><h3 className="card-title">Task System Setup</h3><p className="card-description">Set up board in Jira/Trello, define labels.</p></div>
+                        </div>
+                    </div>
+                    <div className="arrow">↓</div>
+                    {/* Stage 1: Pre-Production */}
+                    <div className="stage">
+                        <h2 className="stage-title" style={{ color: '#10b981' }}>
+                            <svg className="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.311a7.5 7.5 0 0 1-7.5 0c-1.421-.455-2.5-1.683-2.75-3.182S4.5 14.19 4.5 13.5v-1.5c0-.69.055-1.379.168-2.042M12 18V10.5m0 7.5H8.25m3.75 0H15.75m-7.5 0H5.625m7.5 0H18.375m-7.5 0h.008v.015h-.008V18Zm-7.5 0h.008v.015h-.008V18Zm7.5 0h.008v.015h-.008V18Zm7.5 0h.008v.015h-.008V18Z" /></svg>
+                            1. Pre-Production
+                        </h2>
+                        <div className="card-grid">
+                            <div className="card" style={{ borderColor: '#10b981' }}><h3 className="card-title">Core Concept & Script</h3><p className="card-description">Define the core story and text.</p></div>
+                            <div className="card" style={{ borderColor: '#10b981' }}><h3 className="card-title">Script Analysis & Emotion Definition</h3><p className="card-description">Use the emotion table to define the emotional curve for each scene.</p></div>
+                            <div className="card" style={{ borderColor: '#10b981' }}><h3 className="card-title">Visual Reference & Mood Board</h3><p className="card-description">Gather images, colors, lighting references to establish the atmosphere.</p></div>
+                            <div className="card" style={{ borderColor: '#10b981' }}><h3 className="card-title">Storyboard & Animatic</h3><p className="card-description">Draw sketches to define composition, pacing, and shot meaning.</p></div>
+                            <div className="card" style={{ borderColor: '#10b981' }}><h3 className="card-title">Asset List & Tech R&D</h3><p className="card-description">Break down required 3D assets, test key VFX.</p></div>
+                        </div>
+                    </div>
+                    <div className="arrow">↓</div>
+                    {/* Stage 2: Production */}
+                    <div className="stage">
+                        <h2 className="stage-title" style={{ color: '#f97316' }}>
+                            <svg className="icon loop-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 11.667 0l3.181-3.183m-4.991-2.691v4.992h-4.992m0 0-3.181-3.183a8.25 8.25 0 0 1 11.667 0l3.181 3.183" /></svg>
+                            2. Production - (Iterate per Shot)
+                        </h2>
+                        <div className="card-grid">
+                            <div className="card" style={{ borderColor: '#f97316' }}><h3 className="card-title">Asset Acquisition & Integration</h3><p className="card-description">Get assets from online libraries (Fab, Sketchfab) or create them.</p></div>
+                            <div className="card" style={{ borderColor: '#f97316' }}><h3 className="card-title">Music & Sound Selection</h3><p className="card-description">Select key music for the current shot to guide the rhythm.</p></div>
+                            <div className="card" style={{ borderColor: '#f97316' }}><h3 className="card-title">Shot Layout</h3><p className="card-description">Build the scene, set up camera positions.</p></div>
+                            <div className="card" style={{ borderColor: '#f97316' }}><h3 className="card-title">Lighting & Color Draft</h3><p className="card-description">Establish color palette, set up key and mood lighting based on references.</p></div>
+                            <div className="card" style={{ borderColor: '#f97316' }}><h3 className="card-title">Animation</h3><p className="card-description">Create character, object, and camera movements.</p></div>
+                            <div className="card" style={{ borderColor: '#f97316' }}><h3 className="card-title">Visual Effects (VFX)</h3><p className="card-description">Create or integrate necessary visual effects.</p></div>
+                            <div className="card" style={{ borderColor: '#f97316' }}><h3 className="card-title">Rendering</h3><p className="card-description">Output image sequences or video clips.</p></div>
+                        </div>
+                    </div>
+                    <div className="arrow">↓</div>
+                     {/* Stage 3: Post-Production */}
+                    <div className="stage">
+                        <h2 className="stage-title" style={{ color: '#ec4899' }}>
+                            <svg className="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" /></svg>
+                            3. Post-Production
+                        </h2>
+                        <div className="card-grid">
+                            <div className="card" style={{ borderColor: '#ec4899' }}><h3 className="card-title">Editing</h3><p className="card-description">Assemble rendered shots.</p></div>
+                            <div className="card" style={{ borderColor: '#ec4899' }}><h3 className="card-title">Color Grading</h3><p className="card-description">Unify color tone, enhance mood and style.</p></div>
+                            <div className="card" style={{ borderColor: '#ec4899' }}><h3 className="card-title">Sound Design & Mixing</h3><p className="card-description">Add ambient sounds, foley, and mix audio tracks.</p></div>
+                            <div className="card" style={{ borderColor: '#ec4899' }}><h3 className="card-title">Final Tuning & Export</h3><p className="card-description">Make final adjustments and export the final video.</p></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
 };
 
 
@@ -351,6 +450,7 @@ export default function App() {
                         <div className="flex items-center space-x-2">
                             <button onClick={() => setActiveView('Table')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeView === 'Table' ? 'bg-gray-700 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>Table</button>
                             <button onClick={() => setActiveView('Storyboard')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeView === 'Storyboard' ? 'bg-gray-700 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>Storyboard</button>
+                            <button onClick={() => setActiveView('Workflow')} className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeView === 'Workflow' ? 'bg-gray-700 text-white' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}>Workflow</button>
                         </div>
                         <div className="flex items-center space-x-2">
                             <button onClick={handleImportClick} className="p-2 rounded-md text-sm font-medium bg-gray-700 text-gray-300 hover:bg-gray-600 flex items-center space-x-2"><Upload size={16}/><span>Import</span></button>
@@ -359,7 +459,7 @@ export default function App() {
                         </div>
                     </div>
                     
-                    {activeView === 'Table' ? (
+                    {activeView === 'Table' && (
                         <>
                             <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-lg overflow-hidden">
                                 <div className="p-6"><h2 className="text-xl font-semibold text-white">Table & Analysis View</h2><p className="text-gray-400 mt-1">Detailed script analysis, image uploads, and emotion tracking.</p></div>
@@ -388,13 +488,17 @@ export default function App() {
                             </div>
                             <EmotionTimelineChart data={appData.scriptData} columns={appData.emotionColumns} />
                         </>
-                    ) : (
+                    )}
+                    {activeView === 'Storyboard' && (
                         <StoryboardView 
                             storyboardData={appData.storyboardData}
                             onStoryboardChange={handleStoryboardChange}
                             onUploadClick={handleUploadClick}
                             onImageClick={setModalImageUrl}
                         />
+                    )}
+                    {activeView === 'Workflow' && (
+                        <WorkflowView />
                     )}
                 </div>
             </main>
