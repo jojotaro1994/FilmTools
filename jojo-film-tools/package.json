@@ -3,12 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "tailwind:init": "npx tailwindcss init -p"
-  },
+  "dev": "next dev -p 3005",
+  "build": "next build",
+  "start": "next start -p 3005",
+  "lint": "next lint"
+},
   "dependencies": {
     "@tailwindcss/postcss": "^4.1.11",
     "lucide-react": "^0.525.0",
