@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import {
   FileUp,
   Settings,
@@ -28,6 +34,13 @@ import {
   Undo,
   Redo,
   Camera,
+  ClipboardCopy,
+  ClipboardPaste,
+  Bookmark,
+  Video,
+  FolderCog,
+  Package,
+  ImageIcon,
 } from "lucide-react";
 
 // --- Custom Hook for State History (Undo/Redo) ---
@@ -84,6 +97,10 @@ const useHistoryState = (initialState) => {
 
 // --- Initial Data & Helpers ---
 const createInitialData = () => ({
+  projectSettings: {
+    // This is now just for display purposes. The actual access is handled by a directory handle.
+    imageFolderName: "",
+  },
   emotionColumns: [
     { key: "coolFactor", label: "Cool Factor", color: "#f87171" },
     { key: "tension", label: "Tension", color: "#22d3ee" },
@@ -100,6 +117,9 @@ const createInitialData = () => ({
       music: "",
       musicTitle: "",
       musicDuration: 1,
+      referenceVideo: "",
+      referenceVideoTitle: "",
+      referenceVideoDuration: 1,
       coolFactor: 3,
       tension: 1,
       hypeFactor: 2,
@@ -107,16 +127,20 @@ const createInitialData = () => ({
       boredom: 0,
       shotSize: "WS",
       shotType: "EL",
+      isChapterHeading: true,
     },
     {
       id: "scene1-part2",
       level: 1,
       segment:
         "A wide shot of the quiet mountain road. Suddenly, the roar of an AE86 engine shatters the silence, followed by the screech of tires.",
-      image: null,
+      image: "ae86-drift.jpg",
       music: "https://www.youtube.com/watch?v=ZQn3nIa3hAM",
       musicTitle: "Drift sound effect",
       musicDuration: 3,
+      referenceVideo: "https://www.youtube.com/watch?v=iS-yF-V3t1E",
+      referenceVideoTitle: "Initial D Drift Ref",
+      referenceVideoDuration: 1,
       coolFactor: 7,
       tension: 2,
       hypeFactor: 7,
@@ -124,6 +148,7 @@ const createInitialData = () => ({
       boredom: 0,
       shotSize: "LS",
       shotType: "EL",
+      isChapterHeading: false,
     },
     {
       id: "scene1-part3",
@@ -133,6 +158,9 @@ const createInitialData = () => ({
       music: "",
       musicTitle: "",
       musicDuration: 1,
+      referenceVideo: "",
+      referenceVideoTitle: "",
+      referenceVideoDuration: 1,
       coolFactor: 9,
       tension: 3,
       hypeFactor: 9,
@@ -140,16 +168,20 @@ const createInitialData = () => ({
       boredom: 0,
       shotSize: "",
       shotType: "",
+      isChapterHeading: true,
     },
     {
       id: "scene1-part4",
       level: 1,
       segment:
         "A flash of headlights as the AE86 exits a hairpin turn at high speed, the rear of the car inches from the guardrail.",
-      image: null,
+      image: "hairpin-turn.gif",
       music: "",
       musicTitle: "",
       musicDuration: 1,
+      referenceVideo: "",
+      referenceVideoTitle: "",
+      referenceVideoDuration: 1,
       coolFactor: 10,
       tension: 2,
       hypeFactor: 10,
@@ -157,16 +189,20 @@ const createInitialData = () => ({
       boredom: 0,
       shotSize: "MCU",
       shotType: "LA",
+      isChapterHeading: false,
     },
     {
       id: "scene1-part5",
       level: 1,
       segment:
         "[CLOSE UP: A cup of water in the car's cup holder spins violently, but not a single drop spills.]",
-      image: null,
+      image: "water-cup.jpg",
       music: "",
       musicTitle: "",
       musicDuration: 1,
+      referenceVideo: "",
+      referenceVideoTitle: "",
+      referenceVideoDuration: 1,
       coolFactor: 10,
       tension: 1,
       hypeFactor: 9,
@@ -174,6 +210,7 @@ const createInitialData = () => ({
       boredom: 0,
       shotSize: "CU",
       shotType: "EL",
+      isChapterHeading: false,
     },
   ],
 });
@@ -225,7 +262,12 @@ const SHOT_TYPES = [
 ];
 
 // --- Reusable Components ---
-const EditableSegment = ({ value, onChange, placeholder = "..." }) => {
+const EditableSegment = ({
+  value,
+  onChange,
+  placeholder = "...",
+  isHeading = false,
+}) => {
   const [isEditing, setIsEditing] = useState(false);
   const [text, setText] = useState(value);
   const textareaRef = useRef(null);
@@ -266,7 +308,9 @@ const EditableSegment = ({ value, onChange, placeholder = "..." }) => {
         value={text}
         onChange={handleTextChange}
         onBlur={handleBlur}
-        className="bg-gray-600 w-full rounded px-2 py-1.5 text-sm text-white placeholder-gray-400 resize-none overflow-hidden"
+        className={`bg-gray-600 w-full rounded px-2 py-1.5 text-sm text-white placeholder-gray-400 resize-none overflow-hidden ${
+          isHeading ? "text-center text-lg font-bold text-amber-400" : ""
+        }`}
         placeholder={placeholder}
         rows={1}
       />
@@ -276,18 +320,24 @@ const EditableSegment = ({ value, onChange, placeholder = "..." }) => {
   return (
     <div
       onClick={() => setIsEditing(true)}
-      className="cursor-pointer w-full hover:bg-gray-700/50 rounded px-2 py-1.5 min-h-[34px] whitespace-pre-wrap"
+      className={`cursor-pointer w-full hover:bg-gray-700/50 rounded px-2 py-1.5 min-h-[34px] whitespace-pre-wrap ${
+        isHeading ? "text-center text-lg font-bold text-amber-400" : ""
+      }`}
     >
       {value || <span className="text-gray-500">{placeholder}</span>}
     </div>
   );
 };
 
-const EditableMusic = ({ title, link, onSave }) => {
+const EditableMedia = ({ title, link, onSave, type }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [tempTitle, setTempTitle] = useState(title);
   const [tempLink, setTempLink] = useState(link);
   const popupRef = useRef(null);
+
+  const isMusic = type === "music";
+  const colorClass = isMusic ? "text-amber-400" : "text-blue-400";
+  const IconComponent = isMusic ? Music : Video;
 
   useEffect(() => {
     setTempTitle(title);
@@ -317,10 +367,10 @@ const EditableMusic = ({ title, link, onSave }) => {
         }}
         className="flex items-center space-x-2 w-full cursor-pointer p-1 rounded hover:bg-white/10"
       >
-        <Music size={14} className="text-amber-400 flex-shrink-0" />
+        <IconComponent size={14} className={`${colorClass} flex-shrink-0`} />
         <div className="flex-grow truncate">
-          <span className="text-amber-400 text-sm font-medium">
-            {title || "Untitled Music"}
+          <span className={`${colorClass} text-sm font-medium`}>
+            {title || (isMusic ? "Untitled Music" : "Untitled Reference")}
           </span>
         </div>
       </div>
@@ -333,19 +383,21 @@ const EditableMusic = ({ title, link, onSave }) => {
           <div className="space-y-3">
             <div>
               <label className="text-xs text-gray-400 block mb-1">
-                Music Title
+                {isMusic ? "Music Title" : "Reference Title"}
               </label>
               <input
                 type="text"
                 value={tempTitle}
                 onChange={(e) => setTempTitle(e.target.value)}
-                placeholder="e.g., Drift sound effect"
+                placeholder={
+                  isMusic ? "e.g., Drift sound effect" : "e.g., Initial D Ref"
+                }
                 className="bg-gray-700 w-full rounded px-2 py-1.5 text-sm text-white placeholder-gray-500"
               />
             </div>
             <div>
               <label className="text-xs text-gray-400 block mb-1">
-                Music Link
+                {isMusic ? "Music Link" : "Reference Link"}
               </label>
               <input
                 type="text"
@@ -744,15 +796,263 @@ const SelectionPopup = ({
   );
 };
 
+const ImportExportModal = ({
+  mode,
+  onClose,
+  appData,
+  onFileUpload,
+  onTextImport,
+}) => {
+  const [textData, setTextData] = useState("");
+  const [copyStatus, setCopyStatus] = useState("Copy to Clipboard");
+  const [importStatus, setImportStatus] = useState("");
+  const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    if (mode === "export") {
+      setTextData(JSON.stringify(appData, null, 2));
+    } else {
+      setTextData("");
+    }
+    setCopyStatus("Copy to Clipboard");
+    setImportStatus("");
+  }, [mode, appData]);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(textData).then(
+      () => {
+        setCopyStatus("Copied!");
+        setTimeout(() => setCopyStatus("Copy to Clipboard"), 2000);
+      },
+      () => {
+        setCopyStatus("Failed to copy!");
+      }
+    );
+  };
+
+  const handleTextImportClick = () => {
+    try {
+      const parsedData = JSON.parse(textData);
+      onTextImport(parsedData);
+      setImportStatus("Imported successfully!");
+      setTimeout(onClose, 1000);
+    } catch (error) {
+      setImportStatus("Invalid JSON format. Please check your text.");
+      console.error("Invalid JSON:", error);
+    }
+  };
+
+  const handleFileButtonClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  if (!mode) return null;
+
+  return (
+    <div
+      className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-gray-800 rounded-lg shadow-xl p-6 relative w-full max-w-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-semibold text-white">
+            {mode === "import" ? "Import Project Data" : "Export Project Data"}
+          </h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-white">
+            <X size={24} />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          {mode === "export" && (
+            <>
+              <p className="text-sm text-gray-400">
+                Copy the text below or download the JSON file.
+              </p>
+              <textarea
+                readOnly
+                value={textData}
+                className="w-full h-64 bg-gray-900 text-gray-300 text-xs p-3 rounded-md border border-gray-600 focus:ring-amber-500 focus:border-amber-500"
+              />
+              <div className="flex items-center justify-end space-x-4">
+                <button
+                  onClick={handleCopy}
+                  className="px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 flex items-center space-x-2"
+                >
+                  <ClipboardCopy size={16} />
+                  <span>{copyStatus}</span>
+                </button>
+                <button
+                  onClick={() => {
+                    const blob = new Blob([textData], {
+                      type: "application/json",
+                    });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = "jojo-film-tools-data.json";
+                    a.click();
+                    URL.revokeObjectURL(url);
+                  }}
+                  className="px-4 py-2 rounded-md text-sm font-medium bg-gray-600 text-white hover:bg-gray-500 flex items-center space-x-2"
+                >
+                  <Download size={16} />
+                  <span>Download File</span>
+                </button>
+              </div>
+            </>
+          )}
+
+          {mode === "import" && (
+            <>
+              <div>
+                <p className="text-sm text-gray-400 mb-2">
+                  Paste your JSON data here or upload a file.
+                </p>
+                <textarea
+                  value={textData}
+                  onChange={(e) => setTextData(e.target.value)}
+                  className="w-full h-64 bg-gray-900 text-gray-300 text-xs p-3 rounded-md border border-gray-600 focus:ring-amber-500 focus:border-amber-500"
+                  placeholder="Paste your JSON data here..."
+                />
+                {importStatus && (
+                  <p
+                    className={`text-sm mt-2 ${
+                      importStatus.includes("successfully")
+                        ? "text-green-400"
+                        : "text-red-400"
+                    }`}
+                  >
+                    {importStatus}
+                  </p>
+                )}
+              </div>
+              <div className="flex items-center justify-end space-x-4">
+                <button
+                  onClick={handleTextImportClick}
+                  className="px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700 flex items-center space-x-2"
+                >
+                  <ClipboardPaste size={16} />
+                  <span>Import from Text</span>
+                </button>
+                <button
+                  onClick={handleFileButtonClick}
+                  className="px-4 py-2 rounded-md text-sm font-medium bg-gray-600 text-white hover:bg-gray-500 flex items-center space-x-2"
+                >
+                  <FileUp size={16} />
+                  <span>Upload from File</span>
+                </button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={onFileUpload}
+                  accept=".json"
+                  className="hidden"
+                />
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const ProjectSettingsModal = ({ onClose, onSelectFolder, imageFolderName }) => {
+  // This internal handler now manages the async operation and closing the modal.
+  const handleSelectClick = async () => {
+    try {
+      // The onSelectFolder prop should be an async function that
+      // returns true on success or throws an error on cancellation.
+      await onSelectFolder();
+      onClose(); // Close the modal only if onSelectFolder succeeds
+    } catch (error) {
+      // If the user cancels the folder picker, an error is thrown.
+      // We catch it here to prevent it from crashing the app and do nothing,
+      // leaving the modal open.
+      console.log("Folder selection was cancelled or failed.", error);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-gray-800 rounded-lg shadow-xl p-6 relative w-full max-w-md"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-semibold text-white">Project Settings</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-white">
+            <X size={24} />
+          </button>
+        </div>
+        <div className="space-y-4">
+          <div>
+            <label
+              htmlFor="image-base-path"
+              className="block text-sm font-medium text-gray-300 mb-1"
+            >
+              Image Folder
+            </label>
+            <div className="flex items-center space-x-2">
+              <div className="flex-grow p-2 bg-gray-900 rounded-md text-sm text-gray-400 truncate">
+                {imageFolderName || "No folder selected"}
+              </div>
+              {/* The button now calls our new internal handler */}
+              <button
+                onClick={handleSelectClick}
+                className="px-4 py-2 rounded-md text-sm font-medium bg-blue-600 text-white hover:bg-blue-700"
+              >
+                Select Folder
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 mt-1">
+              Select your local project folder containing the images.
+            </p>
+          </div>
+        </div>
+        <div className="flex justify-end space-x-4 mt-6">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-md text-sm font-medium bg-gray-700 text-gray-200 hover:bg-gray-600"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // --- View Components ---
 
-const MusicBlock = ({
+const MediaBlock = ({
   item,
   onScriptChange,
   onPlayMusic,
   totalRows,
   rowIndex,
+  type,
 }) => {
+  const isMusic = type === "music";
+  const data = {
+    link: isMusic ? item.music : item.referenceVideo,
+    title: isMusic ? item.musicTitle : item.referenceVideoTitle,
+    duration: isMusic ? item.musicDuration : item.referenceVideoDuration,
+  };
+  const keys = {
+    link: isMusic ? "music" : "referenceVideo",
+    title: isMusic ? "musicTitle" : "referenceVideoTitle",
+    duration: isMusic ? "musicDuration" : "referenceVideoDuration",
+  };
+  const colorClass = isMusic ? "border-amber-500" : "border-blue-500";
+
   const [isResizing, setIsResizing] = useState(false);
   const startY = useRef(0);
   const startDuration = useRef(1);
@@ -761,7 +1061,7 @@ const MusicBlock = ({
     e.stopPropagation();
     setIsResizing(true);
     startY.current = e.clientY;
-    startDuration.current = item.musicDuration || 1;
+    startDuration.current = data.duration || 1;
     document.body.style.cursor = "ns-resize";
     document.addEventListener("mousemove", handleResizeMouseMove);
     document.addEventListener("mouseup", handleResizeMouseUp);
@@ -777,11 +1077,11 @@ const MusicBlock = ({
       newDuration = Math.max(1, newDuration);
       newDuration = Math.min(newDuration, totalRows - rowIndex);
 
-      if (newDuration !== item.musicDuration) {
-        onScriptChange(item.id, "musicDuration", newDuration);
+      if (newDuration !== data.duration) {
+        onScriptChange(item.id, keys.duration, newDuration);
       }
     },
-    [item.id, item.musicDuration, totalRows, rowIndex, onScriptChange]
+    [item.id, data.duration, totalRows, rowIndex, onScriptChange, keys.duration]
   );
 
   const handleResizeMouseUp = () => {
@@ -792,25 +1092,21 @@ const MusicBlock = ({
   };
 
   const adjustDuration = (amount) => {
-    let newDuration = (item.musicDuration || 1) + amount;
+    let newDuration = (data.duration || 1) + amount;
     newDuration = Math.max(1, newDuration);
     newDuration = Math.min(newDuration, totalRows - rowIndex);
-    onScriptChange(item.id, "musicDuration", newDuration);
+    onScriptChange(item.id, keys.duration, newDuration);
   };
 
   const blockStyle = {
-    height: `${(item.musicDuration || 1) * 5.5 - 0.5}rem`,
+    height: `${(data.duration || 1) * 5.5 - 0.5}rem`,
   };
 
   return (
     <div
       style={blockStyle}
-      className={`relative rounded-lg flex flex-col justify-between border-l-4 border-amber-500 group transition-all duration-150 cursor-move
-                ${
-                  isResizing
-                    ? "shadow-2xl border-amber-300 bg-gray-600"
-                    : "bg-gray-700/50"
-                }
+      className={`relative rounded-lg flex flex-col justify-between ${colorClass} group transition-all duration-150 cursor-move
+                ${isResizing ? "shadow-2xl bg-gray-600" : "bg-gray-700/50"}
             `}
       draggable="true"
       onDragStart={(e) => {
@@ -821,17 +1117,18 @@ const MusicBlock = ({
           e.preventDefault();
           return;
         }
-        e.dataTransfer.setData("text/plain", item.id);
+        e.dataTransfer.setData("text/plain", `${type}-${item.id}`);
         e.dataTransfer.effectAllowed = "move";
       }}
     >
       <div className="p-3 flex-grow flex flex-col justify-start min-h-0">
-        <EditableMusic
-          title={item.musicTitle}
-          link={item.music}
+        <EditableMedia
+          type={type}
+          title={data.title}
+          link={data.link}
           onSave={(newTitle, newLink) => {
-            onScriptChange(item.id, "musicTitle", newTitle);
-            onScriptChange(item.id, "music", newLink);
+            onScriptChange(item.id, keys.title, newTitle);
+            onScriptChange(item.id, keys.link, newLink);
           }}
         />
       </div>
@@ -847,7 +1144,7 @@ const MusicBlock = ({
               adjustDuration(-1);
             }}
             className="p-1 rounded-full hover:bg-white/20 hover:text-white disabled:opacity-50"
-            disabled={item.musicDuration <= 1}
+            disabled={data.duration <= 1}
             title="Decrease duration"
           >
             <Minus size={14} />
@@ -859,33 +1156,33 @@ const MusicBlock = ({
               adjustDuration(1);
             }}
             className="p-1 rounded-full hover:bg-white/20 hover:text-white disabled:opacity-50"
-            disabled={rowIndex + item.musicDuration >= totalRows}
+            disabled={rowIndex + data.duration >= totalRows}
             title="Increase duration"
           >
             <Plus size={14} />
           </button>
         </div>
         <span className="text-xs text-gray-400">
-          Duration: {item.musicDuration || 1}
+          Duration: {data.duration || 1}
         </span>
         <div className="flex items-center space-x-1">
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onPlayMusic(item.music);
+              onPlayMusic(data.link);
             }}
             className="p-1 text-gray-300 rounded-full hover:bg-white/20 hover:text-white"
-            title="Play music"
+            title="Play media"
           >
             <PlayCircle size={18} />
           </button>
           <button
             onClick={(e) => {
               e.stopPropagation();
-              onScriptChange(item.id, "music", "");
+              onScriptChange(item.id, keys.link, "");
             }}
             className="p-1 text-gray-400 rounded-full hover:bg-red-500 hover:text-white"
-            title="Delete music"
+            title="Delete media"
           >
             <Trash2 size={16} />
           </button>
@@ -905,10 +1202,12 @@ const TableView = ({
   onImageClick,
   onPlayMusic,
   onMoveMusic,
+  imageUrlCache,
 }) => {
   const tableRef = useRef(null);
   const segmentNumbers = generateSegmentNumbers(scriptData);
   let musicBlockSkipCounter = 0;
+  let referenceBlockSkipCounter = 0;
   const [dragOverId, setDragOverId] = useState(null);
 
   const FullOverlayGraph = () => {
@@ -924,7 +1223,7 @@ const TableView = ({
       rows.forEach((rowEl) => {
         const rowId = rowEl.dataset.id;
         const rowData = scriptData.find((d) => d.id === rowId);
-        if (!rowData) return;
+        if (!rowData || rowData.isChapterHeading) return;
 
         emotionColumns.forEach((col) => {
           const cell = rowEl.querySelector(`td[data-key="${col.key}"]`);
@@ -968,20 +1267,25 @@ const TableView = ({
     );
   };
 
-  const handleDragOver = (e, row) => {
-    if (!row.music) {
+  const handleDragOver = (e, row, type) => {
+    const canDrop = type === "music" ? !row.music : !row.referenceVideo;
+    if (canDrop) {
       e.preventDefault();
-      setDragOverId(row.id);
+      setDragOverId(`${type}-${row.id}`);
     }
   };
 
-  const handleDrop = (e, row) => {
+  const handleDrop = (e, row, type) => {
     e.preventDefault();
-    if (!row.music) {
-      const sourceId = e.dataTransfer.getData("text/plain");
-      const targetId = row.id;
-      if (sourceId && targetId && sourceId !== targetId) {
-        onMoveMusic(sourceId, targetId);
+    const canDrop = type === "music" ? !row.music : !row.referenceVideo;
+    if (canDrop) {
+      const transferData = e.dataTransfer.getData("text/plain");
+      const [sourceType, sourceId] = transferData.split("-");
+      if (sourceType === type) {
+        const targetId = row.id;
+        if (sourceId && targetId && sourceId !== targetId) {
+          onMoveMusic(sourceId, targetId, type);
+        }
       }
     }
     setDragOverId(null);
@@ -992,17 +1296,157 @@ const TableView = ({
   };
 
   const renderRow = (row, index) => {
-    const isDropTarget = dragOverId === row.id;
+    const isHeading = row.isChapterHeading;
+
+    if (isHeading) {
+      return (
+        <tr key={row.id} data-id={row.id} className="group bg-gray-800/50">
+          <td colSpan={4 + emotionColumns.length} className="px-6 py-3">
+            <div className="flex items-center">
+              <span
+                className="font-mono text-gray-500 mr-4 flex-shrink-0"
+                style={{ paddingLeft: `${row.level * 1.5}rem` }}
+              >
+                {segmentNumbers[row.id]}
+              </span>
+              <div className="flex-grow min-w-0">
+                <EditableSegment
+                  value={row.segment}
+                  onChange={(newText) =>
+                    onScriptChange(row.id, "segment", newText)
+                  }
+                  placeholder="Enter chapter title..."
+                  isHeading={true}
+                />
+              </div>
+              <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity ml-4 flex-shrink-0">
+                <button
+                  onClick={() => onScriptChange(row.id, "toggleChapterHeading")}
+                  className="p-1 hover:bg-gray-600 rounded text-amber-400"
+                  title="Convert to Shot Panel"
+                >
+                  <Bookmark size={16} />
+                </button>
+                <button
+                  onClick={() => onScriptChange(row.id, "add")}
+                  className="p-1 hover:bg-gray-600 rounded"
+                  title="Add new row below"
+                >
+                  <Plus size={16} />
+                </button>
+                <button
+                  disabled={index === 0}
+                  onClick={() => onScriptChange(row.id, "indent")}
+                  className="p-1 hover:bg-gray-600 rounded disabled:opacity-20 disabled:cursor-not-allowed"
+                  title="Increase indent"
+                >
+                  <ArrowRight size={16} />
+                </button>
+                <button
+                  disabled={row.level === 0}
+                  onClick={() => onScriptChange(row.id, "outdent")}
+                  className="p-1 hover:bg-gray-600 rounded disabled:opacity-20 disabled:cursor-not-allowed"
+                  title="Decrease indent"
+                >
+                  <CornerDownLeft size={16} />
+                </button>
+                <button
+                  onClick={() => onScriptChange(row.id, "delete")}
+                  className="p-1 hover:bg-gray-600 rounded text-red-400"
+                  title="Delete this row"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      );
+    }
+
+    const musicCell =
+      musicBlockSkipCounter > 0 ? null : (
+        <td
+          className="px-6 py-4"
+          rowSpan={row.music ? row.musicDuration || 1 : 1}
+          onDragOver={(e) => handleDragOver(e, row, "music")}
+          onDrop={(e) => handleDrop(e, row, "music")}
+          onDragLeave={handleDragLeave}
+        >
+          <div
+            className={`h-full transition-colors ${
+              dragOverId === `music-${row.id}`
+                ? "bg-amber-900/50 rounded-lg"
+                : ""
+            }`}
+          >
+            {row.music ? (
+              <MediaBlock
+                type="music"
+                item={row}
+                onScriptChange={onScriptChange}
+                onPlayMusic={onPlayMusic}
+                totalRows={scriptData.length}
+                rowIndex={index}
+              />
+            ) : (
+              <button
+                onClick={() => onScriptChange(row.id, "music", "https://")}
+                className="w-full h-full text-center text-gray-500 hover:text-amber-400 transition-colors flex flex-col items-center justify-center"
+              >
+                <Music size={16} className="mb-1" />
+                <span className="text-xs">Add Music</span>
+              </button>
+            )}
+          </div>
+        </td>
+      );
+
+    const referenceCell =
+      referenceBlockSkipCounter > 0 ? null : (
+        <td
+          className="px-6 py-4"
+          rowSpan={row.referenceVideo ? row.referenceVideoDuration || 1 : 1}
+          onDragOver={(e) => handleDragOver(e, row, "reference")}
+          onDrop={(e) => handleDrop(e, row, "reference")}
+          onDragLeave={handleDragLeave}
+        >
+          <div
+            className={`h-full transition-colors ${
+              dragOverId === `reference-${row.id}`
+                ? "bg-blue-900/50 rounded-lg"
+                : ""
+            }`}
+          >
+            {row.referenceVideo ? (
+              <MediaBlock
+                type="reference"
+                item={row}
+                onScriptChange={onScriptChange}
+                onPlayMusic={onPlayMusic}
+                totalRows={scriptData.length}
+                rowIndex={index}
+              />
+            ) : (
+              <button
+                onClick={() =>
+                  onScriptChange(row.id, "referenceVideo", "https://")
+                }
+                className="w-full h-full text-center text-gray-500 hover:text-blue-400 transition-colors flex flex-col items-center justify-center"
+              >
+                <Video size={16} className="mb-1" />
+                <span className="text-xs">Add Reference</span>
+              </button>
+            )}
+          </div>
+        </td>
+      );
+
     return (
       <tr
         key={row.id}
         data-id={row.id}
-        className={`group hover:bg-gray-700/50 transition-colors ${
-          isDropTarget ? "bg-amber-900/50" : ""
-        }`}
-        onDragOver={(e) => handleDragOver(e, row)}
-        onDrop={(e) => handleDrop(e, row)}
-        onDragLeave={handleDragLeave}
+        className="group hover:bg-gray-700/50 transition-colors"
       >
         <td className="px-6 py-4 text-gray-300 h-22">
           <div className="flex items-center">
@@ -1022,6 +1466,13 @@ const TableView = ({
               />
             </div>
             <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity ml-4 flex-shrink-0">
+              <button
+                onClick={() => onScriptChange(row.id, "toggleChapterHeading")}
+                className="p-1 text-gray-400 hover:bg-gray-600 hover:text-white rounded"
+                title="Convert to Chapter Heading"
+              >
+                <Bookmark size={16} />
+              </button>
               <button
                 onClick={() => onScriptChange(row.id, "add")}
                 className="p-1 hover:bg-gray-600 rounded"
@@ -1056,14 +1507,14 @@ const TableView = ({
           </div>
         </td>
         <td className="px-6 py-4">
-          <div className="w-20 h-16 relative group/image">
-            {row.image ? (
+          <div className="w-20 h-16 relative group/image bg-gray-900/50 rounded-md">
+            {row.image && imageUrlCache[row.image] ? (
               <>
                 <img
-                  src={row.image}
-                  alt="Thumbnail"
+                  src={imageUrlCache[row.image]}
+                  alt={row.image}
                   className="w-full h-full object-cover rounded-md cursor-pointer"
-                  onClick={() => onImageClick(row.image)}
+                  onClick={() => onImageClick(imageUrlCache[row.image])}
                 />
                 <button
                   onClick={() => onScriptChange(row.id, "image", null)}
@@ -1073,6 +1524,10 @@ const TableView = ({
                   <X size={14} />
                 </button>
               </>
+            ) : row.image ? (
+              <div className="w-full h-full flex items-center justify-center text-xs text-red-400 text-center p-1">
+                Not Found
+              </div>
             ) : (
               <button
                 onClick={() => onUploadClick(row.id)}
@@ -1084,28 +1539,8 @@ const TableView = ({
             )}
           </div>
         </td>
-        <td
-          className="px-6 py-4"
-          rowSpan={row.music ? row.musicDuration || 1 : 1}
-        >
-          {row.music ? (
-            <MusicBlock
-              item={row}
-              onScriptChange={onScriptChange}
-              onPlayMusic={onPlayMusic}
-              totalRows={scriptData.length}
-              rowIndex={index}
-            />
-          ) : (
-            <button
-              onClick={() => onScriptChange(row.id, "music", "https://")}
-              className="w-full h-full text-center text-gray-500 hover:text-amber-400 transition-colors flex flex-col items-center justify-center"
-            >
-              <Music size={16} className="mb-1" />
-              <span className="text-xs">Add Music</span>
-            </button>
-          )}
-        </td>
+        {musicCell}
+        {referenceCell}
         {emotionColumns.map((col) => (
           <td key={col.key} data-key={col.key} className="px-6 py-4">
             <div
@@ -1128,17 +1563,12 @@ const TableView = ({
   };
 
   const renderSkippedRow = (row, index) => {
-    const isDropTarget = dragOverId === row.id;
+    // ... (The logic inside renderSkippedRow for the image cell should also be updated similarly)
     return (
       <tr
         key={row.id}
         data-id={row.id}
-        className={`group hover:bg-gray-700/50 transition-colors ${
-          isDropTarget ? "bg-amber-900/50" : ""
-        }`}
-        onDragOver={(e) => handleDragOver(e, row)}
-        onDrop={(e) => handleDrop(e, row)}
-        onDragLeave={handleDragLeave}
+        className="group hover:bg-gray-700/50 transition-colors"
       >
         <td className="px-6 py-4 text-gray-300 h-22">
           <div className="flex items-center">
@@ -1158,6 +1588,13 @@ const TableView = ({
               />
             </div>
             <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity ml-4 flex-shrink-0">
+              <button
+                onClick={() => onScriptChange(row.id, "toggleChapterHeading")}
+                className="p-1 text-gray-400 hover:bg-gray-600 hover:text-white rounded"
+                title="Convert to Chapter Heading"
+              >
+                <Bookmark size={16} />
+              </button>
               <button
                 onClick={() => onScriptChange(row.id, "add")}
                 className="p-1 hover:bg-gray-600 rounded"
@@ -1192,14 +1629,14 @@ const TableView = ({
           </div>
         </td>
         <td className="px-6 py-4">
-          <div className="w-20 h-16 relative group/image">
-            {row.image ? (
+          <div className="w-20 h-16 relative group/image bg-gray-900/50 rounded-md">
+            {row.image && imageUrlCache[row.image] ? (
               <>
                 <img
-                  src={row.image}
-                  alt="Thumbnail"
+                  src={imageUrlCache[row.image]}
+                  alt={row.image}
                   className="w-full h-full object-cover rounded-md cursor-pointer"
-                  onClick={() => onImageClick(row.image)}
+                  onClick={() => onImageClick(imageUrlCache[row.image])}
                 />
                 <button
                   onClick={() => onScriptChange(row.id, "image", null)}
@@ -1209,6 +1646,10 @@ const TableView = ({
                   <X size={14} />
                 </button>
               </>
+            ) : row.image ? (
+              <div className="w-full h-full flex items-center justify-center text-xs text-red-400 text-center p-1">
+                Not Found
+              </div>
             ) : (
               <button
                 onClick={() => onUploadClick(row.id)}
@@ -1220,6 +1661,7 @@ const TableView = ({
             )}
           </div>
         </td>
+        {/* Skipped rows don't have music/reference cells */}
         {emotionColumns.map((col) => (
           <td key={col.key} data-key={col.key} className="px-6 py-4">
             <div
@@ -1257,6 +1699,9 @@ const TableView = ({
               <th className="px-6 py-3 font-medium text-gray-300 w-48">
                 Music
               </th>
+              <th className="px-6 py-3 font-medium text-gray-300 w-48">
+                Reference
+              </th>
               {emotionColumns.map((col) => (
                 <th
                   key={col.key}
@@ -1269,13 +1714,23 @@ const TableView = ({
           </thead>
           <tbody className="divide-y divide-gray-700">
             {scriptData.map((row, index) => {
+              let musicSkipped = false;
+              let refSkipped = false;
               if (musicBlockSkipCounter > 0) {
                 musicBlockSkipCounter--;
-                return renderSkippedRow(row, index);
+                musicSkipped = true;
+              }
+              if (referenceBlockSkipCounter > 0) {
+                referenceBlockSkipCounter--;
+                refSkipped = true;
               }
 
-              if (row.music) {
+              if (row.music && !musicSkipped) {
                 musicBlockSkipCounter = (row.musicDuration || 1) - 1;
+              }
+              if (row.referenceVideo && !refSkipped) {
+                referenceBlockSkipCounter =
+                  (row.referenceVideoDuration || 1) - 1;
               }
 
               return renderRow(row, index);
@@ -1293,6 +1748,7 @@ const StoryboardView = ({
   onUploadClick,
   onImageClick,
   onPlayMusic,
+  imageUrlCache,
 }) => {
   const [layout, setLayout] = useState("grid");
   const [aspectRatio, setAspectRatio] = useState("16/9");
@@ -1300,19 +1756,38 @@ const StoryboardView = ({
   const aspectStyle = { aspectRatio };
 
   const musicSequences = [];
-  let currentSequence = [];
+  let currentMusicSequence = [];
   scriptData.forEach((item, index) => {
     if (item.music) {
-      if (currentSequence.length > 0) musicSequences.push(currentSequence);
-      currentSequence = [index];
+      if (currentMusicSequence.length > 0)
+        musicSequences.push(currentMusicSequence);
+      currentMusicSequence = [index];
       for (let i = 1; i < (item.musicDuration || 1); i++) {
         if (index + i < scriptData.length) {
-          currentSequence.push(index + i);
+          currentMusicSequence.push(index + i);
         }
       }
     }
   });
-  if (currentSequence.length > 0) musicSequences.push(currentSequence);
+  if (currentMusicSequence.length > 0)
+    musicSequences.push(currentMusicSequence);
+
+  const referenceSequences = [];
+  let currentReferenceSequence = [];
+  scriptData.forEach((item, index) => {
+    if (item.referenceVideo) {
+      if (currentReferenceSequence.length > 0)
+        referenceSequences.push(currentReferenceSequence);
+      currentReferenceSequence = [index];
+      for (let i = 1; i < (item.referenceVideoDuration || 1); i++) {
+        if (index + i < scriptData.length) {
+          currentReferenceSequence.push(index + i);
+        }
+      }
+    }
+  });
+  if (currentReferenceSequence.length > 0)
+    referenceSequences.push(currentReferenceSequence);
 
   const getMusicStatus = (index) => {
     for (const seq of musicSequences) {
@@ -1331,26 +1806,29 @@ const StoryboardView = ({
     const musicItem = musicSequenceInfo
       ? scriptData[musicSequenceInfo[0]]
       : null;
+
+    const referenceSequenceInfo = referenceSequences.find((seq) =>
+      seq.includes(index)
+    );
+    const referenceItem = referenceSequenceInfo
+      ? scriptData[referenceSequenceInfo[0]]
+      : null;
+
     const [activePopup, setActivePopup] = useState(null);
 
+    const isHeading = item.isChapterHeading;
     const musicGlowClass =
-      musicStatus !== "none"
+      musicStatus !== "none" && !isHeading
         ? "ring-2 ring-amber-500/70 shadow-lg shadow-amber-500/20"
         : "";
     const containerClasses =
       viewType === "grid" ? "flex flex-col" : "flex items-stretch";
-    const imageContainerClasses =
-      viewType === "grid" ? "rounded-t-lg" : "w-1/3 flex-shrink-0 rounded-l-lg";
-    const contentContainerClasses =
-      viewType === "grid"
-        ? "p-4 flex-grow flex flex-col justify-between"
-        : "p-4 text-sm text-gray-300 flex-grow flex flex-col justify-between";
 
     return (
       <div
         className={`bg-gray-800 rounded-lg group relative transition-all duration-300 ${musicGlowClass} ${containerClasses}`}
       >
-        {musicStatus !== "none" && (
+        {musicStatus !== "none" && !isHeading && (
           <div className="absolute top-2 left-2 bg-black/50 rounded-full p-1 text-amber-400 z-10">
             {musicStatus === "start" && <Play size={14} />}
             {musicStatus === "end" && <Square size={14} />}
@@ -1358,140 +1836,18 @@ const StoryboardView = ({
           </div>
         )}
 
-        <div
-          className={`bg-gray-900/50 flex items-center justify-center relative group/image ${imageContainerClasses}`}
-          style={aspectStyle}
-        >
-          {item.image ? (
-            <>
-              <img
-                src={item.image}
-                alt={`Storyboard for ${item.segment}`}
-                className={`w-full h-full object-cover ${
-                  viewType === "grid" ? "rounded-t-lg" : "rounded-l-lg"
-                }`}
-                onClick={() => onImageClick(item.image)}
-              />
-              <button
-                onClick={() => onScriptChange(item.id, "image", null)}
-                className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-2 bg-black/60 backdrop-blur-sm rounded-full text-white hover:text-red-400 hover:bg-black/80 transition-all duration-200 opacity-0 group-hover/image:opacity-100 scale-90 group-hover/image:scale-100"
-                title="Delete Image"
-              >
-                <Trash2 size={24} />
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={() => onUploadClick(item.id)}
-              className={`w-full h-full text-gray-500 flex flex-col items-center justify-center ${
-                viewType === "grid" ? "rounded-t-lg" : "rounded-l-lg"
-              }`}
-            >
-              <FileUp size={32} />
-              <p className="text-sm mt-2">Click to Upload</p>
-            </button>
-          )}
-        </div>
-
-        <div className={contentContainerClasses}>
-          <div className="text-sm text-gray-300 mb-3">
-            <EditableSegment
-              value={item.segment}
-              onChange={(newText) =>
-                onScriptChange(item.id, "segment", newText)
-              }
-              placeholder="Enter script segment..."
-            />
-          </div>
-
-          <div className="relative grid grid-cols-2 gap-2 border-t border-gray-700 pt-3 mb-3">
-            <div className="relative">
-              <button
-                onClick={() => setActivePopup("size")}
-                className="w-full text-left p-2 rounded-md bg-gray-700/50 hover:bg-gray-700"
-              >
-                <span className="text-xs text-gray-400">Shot Size</span>
-                <p className="text-sm font-semibold truncate">
-                  {item.shotSize || "Not Set"}
-                </p>
-              </button>
-              {activePopup === "size" && (
-                <SelectionPopup
-                  title="Select Shot Size"
-                  options={SHOT_SIZES}
-                  currentValue={item.shotSize}
-                  onSelect={(value) =>
-                    onScriptChange(item.id, "shotSize", value)
-                  }
-                  onClose={() => setActivePopup(null)}
-                />
-              )}
-            </div>
-            <div className="relative">
-              <button
-                onClick={() => setActivePopup("type")}
-                className="w-full text-left p-2 rounded-md bg-gray-700/50 hover:bg-gray-700"
-              >
-                <span className="text-xs text-gray-400">Shot Type</span>
-                <p className="text-sm font-semibold truncate">
-                  {item.shotType || "Not Set"}
-                </p>
-              </button>
-              {activePopup === "type" && (
-                <SelectionPopup
-                  title="Select Shot Type"
-                  options={SHOT_TYPES}
-                  currentValue={item.shotType}
-                  onSelect={(value) =>
-                    onScriptChange(item.id, "shotType", value)
-                  }
-                  onClose={() => setActivePopup(null)}
-                />
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center space-x-2 border-t border-gray-700 pt-3">
-            {musicItem ? (
-              <>
-                <div className="flex-grow min-w-0">
-                  <EditableMusic
-                    title={musicItem.musicTitle}
-                    link={musicItem.music}
-                    onSave={(newTitle, newLink) => {
-                      onScriptChange(musicItem.id, "musicTitle", newTitle);
-                      onScriptChange(musicItem.id, "music", newLink);
-                    }}
-                  />
-                </div>
-                <button
-                  onClick={() => onScriptChange(musicItem.id, "music", "")}
-                  className="text-gray-400 hover:text-red-400 flex-shrink-0"
-                  title="Delete music"
-                >
-                  <Trash2 size={18} />
-                </button>
-                <button
-                  onClick={() => onPlayMusic(musicItem.music)}
-                  className="text-gray-400 hover:text-amber-400 flex-shrink-0"
-                  title="Play music"
-                >
-                  <PlayCircle size={18} />
-                </button>
-              </>
-            ) : (
-              <button
-                onClick={() => onScriptChange(item.id, "music", "https://")}
-                className="w-full text-left text-gray-500 hover:text-amber-400 transition-colors text-sm flex items-center space-x-2"
-              >
-                <Music size={14} />
-                <span>Add Music</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="absolute top-2 right-2 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+        <div className="absolute top-2 right-2 flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+          <button
+            onClick={() => onScriptChange(item.id, "toggleChapterHeading")}
+            className={`p-1 bg-gray-900/50 hover:bg-gray-900 rounded-full ${
+              isHeading ? "text-amber-400" : "text-white"
+            }`}
+            title={
+              isHeading ? "Convert to Shot Panel" : "Convert to Chapter Heading"
+            }
+          >
+            <Bookmark size={16} />
+          </button>
           <button
             onClick={() => onScriptChange(item.id, "delete")}
             className="p-1 bg-gray-900/50 hover:bg-gray-900 rounded-full text-red-400"
@@ -1500,6 +1856,216 @@ const StoryboardView = ({
             <Trash2 size={16} />
           </button>
         </div>
+
+        {isHeading ? (
+          <div className="p-4 flex-grow flex items-center justify-center h-full min-h-[200px]">
+            <EditableSegment
+              value={item.segment}
+              onChange={(newText) =>
+                onScriptChange(item.id, "segment", newText)
+              }
+              placeholder="Enter chapter title..."
+              isHeading={true}
+            />
+          </div>
+        ) : (
+          <>
+            <div
+              className={`bg-gray-900/50 flex items-center justify-center relative group/image ${
+                viewType === "grid"
+                  ? "rounded-t-lg"
+                  : "w-1/3 flex-shrink-0 rounded-l-lg"
+              }`}
+              style={aspectStyle}
+            >
+              {item.image ? (
+                <>
+                  <img
+                    src={imageUrlCache[item.image] || ""}
+                    alt={item.image}
+                    className={`w-full h-full object-cover ${
+                      viewType === "grid" ? "rounded-t-lg" : "rounded-l-lg"
+                    }`}
+                    onClick={() =>
+                      onImageClick(imageUrlCache[item.image] || "")
+                    }
+                  />
+                  <button
+                    onClick={() => onScriptChange(item.id, "image", null)}
+                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-2 bg-black/60 backdrop-blur-sm rounded-full text-white hover:text-red-400 hover:bg-black/80 transition-all duration-200 opacity-0 group-hover/image:opacity-100 scale-90 group-hover/image:scale-100"
+                    title="Delete Image"
+                  >
+                    <Trash2 size={24} />
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => onUploadClick(item.id)}
+                  className={`w-full h-full text-gray-500 flex flex-col items-center justify-center ${
+                    viewType === "grid" ? "rounded-t-lg" : "rounded-l-lg"
+                  }`}
+                >
+                  <FileUp size={32} />
+                  <p className="text-sm mt-2">Click to Upload</p>
+                </button>
+              )}
+            </div>
+
+            <div
+              className={`${
+                viewType === "grid"
+                  ? "p-4 flex-grow flex flex-col justify-between"
+                  : "p-4 text-sm text-gray-300 flex-grow flex flex-col justify-between"
+              }`}
+            >
+              <div className="text-sm text-gray-300 mb-3">
+                <EditableSegment
+                  value={item.segment}
+                  onChange={(newText) =>
+                    onScriptChange(item.id, "segment", newText)
+                  }
+                  placeholder="Enter script segment..."
+                />
+              </div>
+
+              <div className="relative grid grid-cols-2 gap-2 border-t border-gray-700 pt-3 mb-3">
+                <div className="relative">
+                  <button
+                    onClick={() => setActivePopup("size")}
+                    className="w-full text-left p-2 rounded-md bg-gray-700/50 hover:bg-gray-700"
+                  >
+                    <span className="text-xs text-gray-400">Shot Size</span>
+                    <p className="text-sm font-semibold truncate">
+                      {item.shotSize || "Not Set"}
+                    </p>
+                  </button>
+                  {activePopup === "size" && (
+                    <SelectionPopup
+                      title="Select Shot Size"
+                      options={SHOT_SIZES}
+                      currentValue={item.shotSize}
+                      onSelect={(value) =>
+                        onScriptChange(item.id, "shotSize", value)
+                      }
+                      onClose={() => setActivePopup(null)}
+                    />
+                  )}
+                </div>
+                <div className="relative">
+                  <button
+                    onClick={() => setActivePopup("type")}
+                    className="w-full text-left p-2 rounded-md bg-gray-700/50 hover:bg-gray-700"
+                  >
+                    <span className="text-xs text-gray-400">Shot Type</span>
+                    <p className="text-sm font-semibold truncate">
+                      {item.shotType || "Not Set"}
+                    </p>
+                  </button>
+                  {activePopup === "type" && (
+                    <SelectionPopup
+                      title="Select Shot Type"
+                      options={SHOT_TYPES}
+                      currentValue={item.shotType}
+                      onSelect={(value) =>
+                        onScriptChange(item.id, "shotType", value)
+                      }
+                      onClose={() => setActivePopup(null)}
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2 border-t border-gray-700 pt-3">
+                {musicItem ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="flex-grow min-w-0">
+                      <EditableMedia
+                        type="music"
+                        title={musicItem.musicTitle}
+                        link={musicItem.music}
+                        onSave={(newTitle, newLink) => {
+                          onScriptChange(musicItem.id, "musicTitle", newTitle);
+                          onScriptChange(musicItem.id, "music", newLink);
+                        }}
+                      />
+                    </div>
+                    <button
+                      onClick={() => onScriptChange(musicItem.id, "music", "")}
+                      className="text-gray-400 hover:text-red-400 flex-shrink-0"
+                      title="Delete music"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                    <button
+                      onClick={() => onPlayMusic(musicItem.music)}
+                      className="text-gray-400 hover:text-amber-400 flex-shrink-0"
+                      title="Play music"
+                    >
+                      <PlayCircle size={18} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => onScriptChange(item.id, "music", "https://")}
+                    className="w-full text-left text-gray-500 hover:text-amber-400 transition-colors text-sm flex items-center space-x-2"
+                  >
+                    <Music size={14} />
+                    <span>Add Music</span>
+                  </button>
+                )}
+                {referenceItem ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="flex-grow min-w-0">
+                      <EditableMedia
+                        type="reference"
+                        title={referenceItem.referenceVideoTitle}
+                        link={referenceItem.referenceVideo}
+                        onSave={(newTitle, newLink) => {
+                          onScriptChange(
+                            referenceItem.id,
+                            "referenceVideoTitle",
+                            newTitle
+                          );
+                          onScriptChange(
+                            referenceItem.id,
+                            "referenceVideo",
+                            newLink
+                          );
+                        }}
+                      />
+                    </div>
+                    <button
+                      onClick={() =>
+                        onScriptChange(referenceItem.id, "referenceVideo", "")
+                      }
+                      className="text-gray-400 hover:text-red-400 flex-shrink-0"
+                      title="Delete reference"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                    <button
+                      onClick={() => onPlayMusic(referenceItem.referenceVideo)}
+                      className="text-gray-400 hover:text-blue-400 flex-shrink-0"
+                      title="Play reference"
+                    >
+                      <PlayCircle size={18} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() =>
+                      onScriptChange(item.id, "referenceVideo", "https://")
+                    }
+                    className="w-full text-left text-gray-500 hover:text-blue-400 transition-colors text-sm flex items-center space-x-2"
+                  >
+                    <Video size={14} />
+                    <span>Add Reference</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     );
   };
@@ -1969,6 +2535,232 @@ const WorkflowView = () => {
   );
 };
 
+const AssetView = ({
+  scriptData,
+  imageUrlCache,
+  onPlayMusic,
+  onScriptChange,
+}) => {
+  const [selectedAssets, setSelectedAssets] = useState(new Map());
+
+  const assets = useMemo(() => {
+    const imageAssets = new Map();
+    const musicAssets = new Map();
+    const referenceAssets = new Map();
+
+    scriptData.forEach((row) => {
+      if (row.image) {
+        if (!imageAssets.has(row.image)) imageAssets.set(row.image, []);
+        imageAssets.get(row.image).push(row.id);
+      }
+      if (row.music) {
+        if (!musicAssets.has(row.music))
+          musicAssets.set(row.music, { title: row.musicTitle, usedBy: [] });
+        musicAssets.get(row.music).usedBy.push(row.id);
+      }
+      if (row.referenceVideo) {
+        if (!referenceAssets.has(row.referenceVideo))
+          referenceAssets.set(row.referenceVideo, {
+            title: row.referenceVideoTitle,
+            usedBy: [],
+          });
+        referenceAssets.get(row.referenceVideo).usedBy.push(row.id);
+      }
+    });
+    return { imageAssets, musicAssets, referenceAssets };
+  }, [scriptData]);
+
+  const handleSelect = (type, key) => {
+    const newSelection = new Map(selectedAssets);
+    if (!newSelection.has(type)) {
+      newSelection.set(type, new Set());
+    }
+    const typeSet = newSelection.get(type);
+    if (typeSet.has(key)) {
+      typeSet.delete(key);
+    } else {
+      typeSet.add(key);
+    }
+    setSelectedAssets(newSelection);
+  };
+
+  const handleSelectAll = (type, keys) => {
+    const newSelection = new Map(selectedAssets);
+    const currentTypeSet = newSelection.get(type) || new Set();
+
+    // If not all are selected, select all. Otherwise, clear selection.
+    if (currentTypeSet.size < keys.length) {
+      newSelection.set(type, new Set(keys));
+    } else {
+      newSelection.set(type, new Set());
+    }
+    setSelectedAssets(newSelection);
+  };
+
+  const handleRemoveFromProject = () => {
+    onScriptChange(null, "removeAssets", selectedAssets);
+    setSelectedAssets(new Map());
+  };
+
+  const handleDeleteUnused = (type) => {
+    // This is a placeholder for a more complex deletion logic.
+    // In a real app, this would involve checking which assets are marked as "Unused"
+    // and then removing them from a central asset list (which we don't have yet).
+    // For now, it just clears the selection.
+    alert(
+      "This feature would delete unused assets from a central library. Functionality not fully implemented in this demo."
+    );
+    setSelectedAssets(new Map());
+  };
+
+  const renderAssetSection = (title, icon, assetMap, type) => {
+    const keys = Array.from(assetMap.keys());
+    const selectedCount = selectedAssets.get(type)?.size || 0;
+
+    return (
+      <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-6">
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center space-x-3">
+            {icon}
+            <h3 className="text-xl font-semibold text-white">{title}</h3>
+            <span className="text-sm text-gray-400">({keys.length})</span>
+          </div>
+          <div className="flex items-center space-x-4">
+            {selectedCount > 0 && (
+              <button
+                onClick={handleRemoveFromProject}
+                className="text-sm text-yellow-400 hover:text-yellow-300 flex items-center space-x-2"
+              >
+                <Trash2 size={16} />
+                <span>Remove from Project ({selectedCount})</span>
+              </button>
+            )}
+            <button
+              onClick={() => handleSelectAll(type, keys)}
+              className="text-sm text-gray-300 hover:text-white"
+            >
+              {selectedCount > 0 && selectedCount === keys.length
+                ? "Deselect All"
+                : "Select All"}
+            </button>
+          </div>
+        </div>
+        {keys.length === 0 ? (
+          <p className="text-gray-500 text-center py-8">
+            No assets of this type in the project.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {keys.map((key) => {
+              const isSelected = selectedAssets.get(type)?.has(key) || false;
+              const info = assetMap.get(key);
+              const usedBy = Array.isArray(info) ? info : info.usedBy;
+              const assetTitle = Array.isArray(info) ? key : info.title;
+
+              return (
+                <div
+                  key={key}
+                  className={`border rounded-lg overflow-hidden transition-all ${
+                    isSelected
+                      ? "border-amber-500 ring-2 ring-amber-500/50"
+                      : "border-gray-700"
+                  }`}
+                >
+                  <div className="p-3 bg-gray-900/50 flex items-start space-x-3">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => handleSelect(type, key)}
+                      className="mt-1 w-4 h-4 text-amber-600 bg-gray-700 border-gray-600 rounded focus:ring-amber-500"
+                    />
+                    {type === "image" ? (
+                      <div className="w-16 h-16 bg-black rounded-md flex-shrink-0">
+                        {imageUrlCache[key] ? (
+                          <img
+                            src={imageUrlCache[key]}
+                            alt={key}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-xs text-red-500">
+                            ?
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => onPlayMusic(key)}
+                        className="p-3 bg-gray-700 rounded-md hover:bg-gray-600"
+                      >
+                        {type === "music" ? (
+                          <Music className="text-amber-400" />
+                        ) : (
+                          <Video className="text-blue-400" />
+                        )}
+                      </button>
+                    )}
+                    <div className="flex-grow min-w-0">
+                      <p
+                        className="text-sm font-semibold text-white truncate"
+                        title={assetTitle}
+                      >
+                        {assetTitle}
+                      </p>
+                      <p className="text-xs text-gray-400 truncate" title={key}>
+                        {type === "image" ? key : "Link"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="p-3 bg-gray-800">
+                    <p className="text-xs text-gray-500 mb-1">
+                      Used in segments:
+                    </p>
+                    {usedBy.length > 0 ? (
+                      <p className="text-sm text-gray-300 truncate">
+                        {usedBy
+                          .map(
+                            (id) =>
+                              generateSegmentNumbers(scriptData)[id] || "?"
+                          )
+                          .join(", ")}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-yellow-400">Unused</p>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-8">
+      {renderAssetSection(
+        "Images",
+        <ImageIcon className="text-gray-400" />,
+        assets.imageAssets,
+        "image"
+      )}
+      {renderAssetSection(
+        "Music",
+        <Music className="text-amber-400" />,
+        assets.musicAssets,
+        "music"
+      )}
+      {renderAssetSection(
+        "Reference Videos",
+        <Video className="text-blue-400" />,
+        assets.referenceAssets,
+        "reference"
+      )}
+    </div>
+  );
+};
+
 // --- Main Application Component ---
 export default function App() {
   const [appData, setAppData, undo, redo, canUndo, canRedo, resetAppData] =
@@ -1980,9 +2772,16 @@ export default function App() {
   const [activeUpload, setActiveUpload] = useState({ id: null });
   const [showOverlay, setShowOverlay] = useState(false);
   const [isMetricSettingsOpen, setIsMetricSettingsOpen] = useState(false);
+  const [isProjectSettingsOpen, setIsProjectSettingsOpen] = useState(false);
   const [isResetModalOpen, setIsResetModalOpen] = useState(false);
   const [musicEmbedUrl, setMusicEmbedUrl] = useState(null);
   const [copyNotification, setCopyNotification] = useState("");
+  const [isImportExportModalOpen, setIsImportExportModalOpen] = useState({
+    isOpen: false,
+    mode: null,
+  });
+  const [imageDirectoryHandle, setImageDirectoryHandle] = useState(null);
+  const [imageUrlCache, setImageUrlCache] = useState({});
 
   const fileUploadRef = useRef(null);
   const importFileRef = useRef(null);
@@ -2005,6 +2804,62 @@ export default function App() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    const updateImageUrlCache = async () => {
+      if (!imageDirectoryHandle) return;
+
+      const newCache = {};
+      const uniqueImageFiles = [
+        ...new Set(appData.scriptData.map((row) => row.image).filter(Boolean)),
+      ];
+
+      for (const fileName of uniqueImageFiles) {
+        try {
+          const fileHandle = await imageDirectoryHandle.getFileHandle(fileName);
+          const file = await fileHandle.getFile();
+          newCache[fileName] = URL.createObjectURL(file);
+        } catch (error) {
+          console.warn(
+            `Could not find or access image "${fileName}" in the selected directory.`,
+            error
+          );
+          newCache[fileName] = null; // Mark as not found
+        }
+      }
+
+      // Revoke old URLs to prevent memory leaks
+      Object.values(imageUrlCache).forEach((url) => {
+        if (url) URL.revokeObjectURL(url);
+      });
+
+      setImageUrlCache(newCache);
+    };
+
+    updateImageUrlCache();
+
+    return () => {
+      Object.values(imageUrlCache).forEach((url) => {
+        if (url) URL.revokeObjectURL(url);
+      });
+    };
+  }, [imageDirectoryHandle, appData.scriptData]);
+
+  const handleSelectFolder = async () => {
+    try {
+      if (window.showDirectoryPicker) {
+        const handle = await window.showDirectoryPicker();
+        setImageDirectoryHandle(handle);
+        handleProjectSettingsSave({ imageFolderName: handle.name });
+      } else {
+        alert(
+          "Your browser does not support the File System Access API. Please use a modern browser like Chrome or Edge."
+        );
+      }
+    } catch (error) {
+      console.error("Error selecting directory:", error);
+    }
+  };
+
   const handleUploadClick = (id) => {
     setActiveUpload({ id });
     fileUploadRef.current.click();
@@ -2014,18 +2869,13 @@ export default function App() {
     const file = event.target.files[0];
     if (!file || !activeUpload.id) return;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const base64Image = e.target.result;
-      const { id } = activeUpload;
-      setAppData((prev) => {
-        const updatedData = prev.scriptData.map((row) =>
-          row.id === id ? { ...row, image: base64Image } : row
-        );
-        return { ...prev, scriptData: updatedData };
-      });
-    };
-    reader.readAsDataURL(file);
+    const { id } = activeUpload;
+    setAppData((prev) => {
+      const newScriptData = prev.scriptData.map((row) =>
+        row.id === id ? { ...row, image: file.name } : row
+      );
+      return { ...prev, scriptData: newScriptData };
+    });
 
     event.target.value = null;
     setActiveUpload({ id: null });
@@ -2060,6 +2910,13 @@ export default function App() {
             index === currentIndex ? { ...row, shotType: value } : row
           );
           break;
+        case "toggleChapterHeading":
+          newScriptData = newScriptData.map((row, index) =>
+            index === currentIndex
+              ? { ...row, isChapterHeading: !row.isChapterHeading }
+              : row
+          );
+          break;
         case "music":
           newScriptData = newScriptData.map((row, index) => {
             if (index !== currentIndex) return row;
@@ -2082,6 +2939,32 @@ export default function App() {
             index === currentIndex ? { ...row, musicDuration: value } : row
           );
           break;
+        case "referenceVideo":
+          newScriptData = newScriptData.map((row, index) => {
+            if (index !== currentIndex) return row;
+            const newRow = { ...row, referenceVideo: value };
+            if (value2 !== undefined) newRow.referenceVideoTitle = value2;
+            if (!value) {
+              newRow.referenceVideoDuration = 1;
+              newRow.referenceVideoTitle = "";
+            }
+            return newRow;
+          });
+          break;
+        case "referenceVideoTitle":
+          newScriptData = newScriptData.map((row, index) =>
+            index === currentIndex
+              ? { ...row, referenceVideoTitle: value }
+              : row
+          );
+          break;
+        case "referenceVideoDuration":
+          newScriptData = newScriptData.map((row, index) =>
+            index === currentIndex
+              ? { ...row, referenceVideoDuration: value }
+              : row
+          );
+          break;
         case "add":
           const addIndex = id ? currentIndex : newScriptData.length - 1;
           const newRow = {
@@ -2092,8 +2975,12 @@ export default function App() {
             music: "",
             musicTitle: "",
             musicDuration: 1,
+            referenceVideo: "",
+            referenceVideoTitle: "",
+            referenceVideoDuration: 1,
             shotSize: "",
             shotType: "",
+            isChapterHeading: false,
           };
           prev.emotionColumns.forEach((col) => (newRow[col.key] = 0));
           newScriptData.splice(addIndex + 1, 0, newRow);
@@ -2121,6 +3008,35 @@ export default function App() {
               : row
           );
           break;
+        case "removeAssets":
+          const assetsToRemove = value;
+          newScriptData = newScriptData.map((row) => {
+            const newRow = { ...row };
+            if (
+              assetsToRemove.has("image") &&
+              assetsToRemove.get("image").has(row.image)
+            ) {
+              newRow.image = null;
+            }
+            if (
+              assetsToRemove.has("music") &&
+              assetsToRemove.get("music").has(row.music)
+            ) {
+              newRow.music = "";
+              newRow.musicTitle = "";
+              newRow.musicDuration = 1;
+            }
+            if (
+              assetsToRemove.has("reference") &&
+              assetsToRemove.get("reference").has(row.referenceVideo)
+            ) {
+              newRow.referenceVideo = "";
+              newRow.referenceVideoTitle = "";
+              newRow.referenceVideoDuration = 1;
+            }
+            return newRow;
+          });
+          break;
         default:
           break;
       }
@@ -2128,33 +3044,52 @@ export default function App() {
     });
   };
 
-  const handleMoveMusic = (sourceId, targetId) => {
+  const handleMoveMusic = (sourceId, targetId, type) => {
     setAppData((prev) => {
       const newScriptData = [...prev.scriptData];
       const sourceIndex = newScriptData.findIndex((row) => row.id === sourceId);
       const targetIndex = newScriptData.findIndex((row) => row.id === targetId);
 
+      const linkKey = type === "music" ? "music" : "referenceVideo";
+
       if (
         sourceIndex === -1 ||
         targetIndex === -1 ||
-        newScriptData[targetIndex].music
+        newScriptData[targetIndex][linkKey]
       ) {
         return prev;
       }
 
-      const { music, musicTitle, musicDuration } = newScriptData[sourceIndex];
-      newScriptData[targetIndex] = {
-        ...newScriptData[targetIndex],
-        music,
-        musicTitle,
-        musicDuration,
-      };
-      newScriptData[sourceIndex] = {
-        ...newScriptData[sourceIndex],
-        music: "",
-        musicTitle: "",
-        musicDuration: 1,
-      };
+      if (type === "music") {
+        const { music, musicTitle, musicDuration } = newScriptData[sourceIndex];
+        newScriptData[targetIndex] = {
+          ...newScriptData[targetIndex],
+          music,
+          musicTitle,
+          musicDuration,
+        };
+        newScriptData[sourceIndex] = {
+          ...newScriptData[sourceIndex],
+          music: "",
+          musicTitle: "",
+          musicDuration: 1,
+        };
+      } else {
+        const { referenceVideo, referenceVideoTitle, referenceVideoDuration } =
+          newScriptData[sourceIndex];
+        newScriptData[targetIndex] = {
+          ...newScriptData[targetIndex],
+          referenceVideo,
+          referenceVideoTitle,
+          referenceVideoDuration,
+        };
+        newScriptData[sourceIndex] = {
+          ...newScriptData[sourceIndex],
+          referenceVideo: "",
+          referenceVideoTitle: "",
+          referenceVideoDuration: 1,
+        };
+      }
 
       return { ...prev, scriptData: newScriptData };
     });
@@ -2252,21 +3187,22 @@ export default function App() {
     });
   };
 
-  const handleExport = () => {
-    const jsonString = JSON.stringify(appData, null, 2);
-    const blob = new Blob([jsonString], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "jojo-film-tools-data.json";
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+  const handleProjectSettingsSave = (newSettings) => {
+    setAppData((prev) => ({
+      ...prev,
+      projectSettings: {
+        ...prev.projectSettings,
+        ...newSettings,
+      },
+    }));
   };
 
-  const handleImportClick = () => {
-    importFileRef.current.click();
+  const handleTextImport = (data) => {
+    if (data.scriptData && data.emotionColumns) {
+      resetAppData({ ...createInitialData(), ...data });
+    } else {
+      throw new Error("Invalid file format.");
+    }
   };
 
   const handleImportFile = (event) => {
@@ -2276,11 +3212,8 @@ export default function App() {
     reader.onload = (e) => {
       try {
         const importedData = JSON.parse(e.target.result);
-        if (importedData.scriptData && importedData.emotionColumns) {
-          resetAppData({ ...createInitialData(), ...importedData });
-        } else {
-          throw new Error("Invalid file format.");
-        }
+        handleTextImport(importedData);
+        setIsImportExportModalOpen({ isOpen: false, mode: null });
       } catch (error) {
         console.error("Failed to import file:", error);
         alert(
@@ -2363,6 +3296,16 @@ export default function App() {
                 Storyboard
               </button>
               <button
+                onClick={() => setActiveView("Assets")}
+                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeView === "Assets"
+                    ? "bg-gray-700 text-white"
+                    : "bg-gray-800 text-gray-400 hover:bg-gray-700"
+                }`}
+              >
+                Assets
+              </button>
+              <button
                 onClick={() => setActiveView("Workflow")}
                 className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                   activeView === "Workflow"
@@ -2391,14 +3334,18 @@ export default function App() {
                 <span>Redo</span>
               </button>
               <button
-                onClick={handleImportClick}
+                onClick={() =>
+                  setIsImportExportModalOpen({ isOpen: true, mode: "import" })
+                }
                 className="p-2 rounded-md text-sm font-medium bg-gray-700 text-gray-300 hover:bg-gray-600 flex items-center space-x-2"
               >
                 <Upload size={16} />
                 <span>Import</span>
               </button>
               <button
-                onClick={handleExport}
+                onClick={() =>
+                  setIsImportExportModalOpen({ isOpen: true, mode: "export" })
+                }
                 className="p-2 rounded-md text-sm font-medium bg-gray-700 text-gray-300 hover:bg-gray-600 flex items-center space-x-2"
               >
                 <Download size={16} />
@@ -2445,6 +3392,13 @@ export default function App() {
                       )}
                     </div>
                     <button
+                      onClick={() => setIsProjectSettingsOpen(true)}
+                      className="flex items-center space-x-2 text-gray-300 hover:text-white"
+                    >
+                      <FolderCog size={16} />
+                      <span>Project Settings</span>
+                    </button>
+                    <button
                       onClick={handleCopyScript}
                       className="flex items-center space-x-2 text-gray-300 hover:text-white"
                     >
@@ -2480,6 +3434,7 @@ export default function App() {
                   onImageClick={setModalImageUrl}
                   onPlayMusic={handlePlayMusic}
                   onMoveMusic={handleMoveMusic}
+                  imageUrlCache={imageUrlCache}
                 />
               </div>
               <MetricTimelineChart
@@ -2496,6 +3451,15 @@ export default function App() {
               onUploadClick={handleUploadClick}
               onImageClick={setModalImageUrl}
               onPlayMusic={handlePlayMusic}
+              imageUrlCache={imageUrlCache}
+            />
+          )}
+          {activeView === "Assets" && (
+            <AssetView
+              scriptData={appData.scriptData}
+              imageUrlCache={imageUrlCache}
+              onPlayMusic={handlePlayMusic}
+              onScriptChange={handleScriptChange}
             />
           )}
           {activeView === "Workflow" && <WorkflowView />}
@@ -2508,13 +3472,28 @@ export default function App() {
         accept="image/*"
         className="hidden"
       />
-      <input
-        type="file"
-        ref={importFileRef}
-        onChange={handleImportFile}
-        accept=".json"
-        className="hidden"
+
+      <ImportExportModal
+        mode={isImportExportModalOpen.mode}
+        isOpen={isImportExportModalOpen.isOpen}
+        onClose={() =>
+          setIsImportExportModalOpen({ isOpen: false, mode: null })
+        }
+        appData={appData}
+        onFileUpload={handleImportFile}
+        onTextImport={handleTextImport}
       />
+
+      {isProjectSettingsOpen && (
+        <ProjectSettingsModal
+          settings={appData.projectSettings}
+          onSave={handleProjectSettingsSave}
+          onClose={() => setIsProjectSettingsOpen(false)}
+          onSelectFolder={handleSelectFolder}
+          imageFolderName={imageDirectoryHandle?.name}
+        />
+      )}
+
       <ImageModal
         imageUrl={modalImageUrl}
         onClose={() => setModalImageUrl(null)}
