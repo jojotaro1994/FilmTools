@@ -2971,6 +2971,7 @@ export default function App() {
     let embedUrl = null;
 
     try {
+      // YouTube URL Parser (no changes here)
       const youtubeRegex =
         /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
       const youtubeMatch = url.match(youtubeRegex);
@@ -2979,14 +2980,25 @@ export default function App() {
         embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&origin=https://www.youtube.com`;
       }
 
+      // *** MODIFICATION START: Enhanced Bilibili URL Parser ***
       if (!embedUrl) {
-        const bilibiliRegex = /bilibili\.com\/video\/(BV[1-9A-HJ-NP-Za-km-z]+)/;
+        // This new regex handles www, m, and no subdomain, as well as both BV and av video IDs.
+        const bilibiliRegex =
+          /(?:www\.|m\.)?bilibili\.com\/video\/(av[0-9]+|BV[1-9A-HJ-NP-Za-km-z]+)/;
         const bilibiliMatch = url.match(bilibiliRegex);
+
         if (bilibiliMatch && bilibiliMatch[1]) {
-          const bvid = bilibiliMatch[1];
-          embedUrl = `https://player.bilibili.com/player.html?bvid=${bvid}&page=1&autoplay=1`;
+          const videoId = bilibiliMatch[1];
+          // Check if it's a BV or an older AV number and construct the correct embed URL.
+          if (videoId.startsWith("BV")) {
+            embedUrl = `https://player.bilibili.com/player.html?bvid=${videoId}&page=1&autoplay=1`;
+          } else if (videoId.startsWith("av")) {
+            const aid = videoId.substring(2); // Remove the "av" prefix
+            embedUrl = `https://player.bilibili.com/player.html?aid=${aid}&page=1&autoplay=1`;
+          }
         }
       }
+      // *** MODIFICATION END ***
     } catch (error) {
       console.error("Could not parse URL:", error);
     }
@@ -2994,6 +3006,7 @@ export default function App() {
     if (embedUrl) {
       setMusicEmbedUrl(embedUrl);
     } else {
+      // Fallback for any other URL: open in a new tab.
       window.open(url, "_blank", "noopener,noreferrer");
     }
   };
