@@ -1295,7 +1295,7 @@ const TableView = ({
     setDragOverId(null);
   };
 
-  const renderRow = (row, index) => {
+  const renderRow = (row, index, isMusicSkipped, isRefSkipped) => {
     const isHeading = row.isChapterHeading;
 
     if (isHeading) {
@@ -1364,83 +1364,79 @@ const TableView = ({
       );
     }
 
-    const musicCell =
-      musicBlockSkipCounter > 0 ? null : (
-        <td
-          className="px-6 py-4"
-          rowSpan={row.music ? row.musicDuration || 1 : 1}
-          onDragOver={(e) => handleDragOver(e, row, "music")}
-          onDrop={(e) => handleDrop(e, row, "music")}
-          onDragLeave={handleDragLeave}
+    const musicCell = isMusicSkipped ? null : (
+      <td
+        className="px-6 py-4"
+        rowSpan={row.music ? row.musicDuration || 1 : 1}
+        onDragOver={(e) => handleDragOver(e, row, "music")}
+        onDrop={(e) => handleDrop(e, row, "music")}
+        onDragLeave={handleDragLeave}
+      >
+        <div
+          className={`h-full transition-colors ${
+            dragOverId === `music-${row.id}` ? "bg-amber-900/50 rounded-lg" : ""
+          }`}
         >
-          <div
-            className={`h-full transition-colors ${
-              dragOverId === `music-${row.id}`
-                ? "bg-amber-900/50 rounded-lg"
-                : ""
-            }`}
-          >
-            {row.music ? (
-              <MediaBlock
-                type="music"
-                item={row}
-                onScriptChange={onScriptChange}
-                onPlayMusic={onPlayMusic}
-                totalRows={scriptData.length}
-                rowIndex={index}
-              />
-            ) : (
-              <button
-                onClick={() => onScriptChange(row.id, "music", "https://")}
-                className="w-full h-full text-center text-gray-500 hover:text-amber-400 transition-colors flex flex-col items-center justify-center"
-              >
-                <Music size={16} className="mb-1" />
-                <span className="text-xs">Add Music</span>
-              </button>
-            )}
-          </div>
-        </td>
-      );
+          {row.music ? (
+            <MediaBlock
+              type="music"
+              item={row}
+              onScriptChange={onScriptChange}
+              onPlayMusic={onPlayMusic}
+              totalRows={scriptData.length}
+              rowIndex={index}
+            />
+          ) : (
+            <button
+              onClick={() => onScriptChange(row.id, "music", "https://")}
+              className="w-full h-full text-center text-gray-500 hover:text-amber-400 transition-colors flex flex-col items-center justify-center"
+            >
+              <Music size={16} className="mb-1" />
+              <span className="text-xs">Add Music</span>
+            </button>
+          )}
+        </div>
+      </td>
+    );
 
-    const referenceCell =
-      referenceBlockSkipCounter > 0 ? null : (
-        <td
-          className="px-6 py-4"
-          rowSpan={row.referenceVideo ? row.referenceVideoDuration || 1 : 1}
-          onDragOver={(e) => handleDragOver(e, row, "reference")}
-          onDrop={(e) => handleDrop(e, row, "reference")}
-          onDragLeave={handleDragLeave}
+    const referenceCell = isRefSkipped ? null : (
+      <td
+        className="px-6 py-4"
+        rowSpan={row.referenceVideo ? row.referenceVideoDuration || 1 : 1}
+        onDragOver={(e) => handleDragOver(e, row, "reference")}
+        onDrop={(e) => handleDrop(e, row, "reference")}
+        onDragLeave={handleDragLeave}
+      >
+        <div
+          className={`h-full transition-colors ${
+            dragOverId === `reference-${row.id}`
+              ? "bg-blue-900/50 rounded-lg"
+              : ""
+          }`}
         >
-          <div
-            className={`h-full transition-colors ${
-              dragOverId === `reference-${row.id}`
-                ? "bg-blue-900/50 rounded-lg"
-                : ""
-            }`}
-          >
-            {row.referenceVideo ? (
-              <MediaBlock
-                type="reference"
-                item={row}
-                onScriptChange={onScriptChange}
-                onPlayMusic={onPlayMusic}
-                totalRows={scriptData.length}
-                rowIndex={index}
-              />
-            ) : (
-              <button
-                onClick={() =>
-                  onScriptChange(row.id, "referenceVideo", "https://")
-                }
-                className="w-full h-full text-center text-gray-500 hover:text-blue-400 transition-colors flex flex-col items-center justify-center"
-              >
-                <Video size={16} className="mb-1" />
-                <span className="text-xs">Add Reference</span>
-              </button>
-            )}
-          </div>
-        </td>
-      );
+          {row.referenceVideo ? (
+            <MediaBlock
+              type="reference"
+              item={row}
+              onScriptChange={onScriptChange}
+              onPlayMusic={onPlayMusic}
+              totalRows={scriptData.length}
+              rowIndex={index}
+            />
+          ) : (
+            <button
+              onClick={() =>
+                onScriptChange(row.id, "referenceVideo", "https://")
+              }
+              className="w-full h-full text-center text-gray-500 hover:text-blue-400 transition-colors flex flex-col items-center justify-center"
+            >
+              <Video size={16} className="mb-1" />
+              <span className="text-xs">Add Reference</span>
+            </button>
+          )}
+        </div>
+      </td>
+    );
 
     return (
       <tr
@@ -1562,127 +1558,6 @@ const TableView = ({
     );
   };
 
-  const renderSkippedRow = (row, index) => {
-    // ... (The logic inside renderSkippedRow for the image cell should also be updated similarly)
-    return (
-      <tr
-        key={row.id}
-        data-id={row.id}
-        className="group hover:bg-gray-700/50 transition-colors"
-      >
-        <td className="px-6 py-4 text-gray-300 h-22">
-          <div className="flex items-center">
-            <span
-              className="font-mono text-gray-500 mr-4 flex-shrink-0"
-              style={{ paddingLeft: `${row.level * 1.5}rem` }}
-            >
-              {segmentNumbers[row.id]}
-            </span>
-            <div className="flex-grow min-w-0">
-              <EditableSegment
-                value={row.segment}
-                onChange={(newText) =>
-                  onScriptChange(row.id, "segment", newText)
-                }
-                placeholder="Enter script segment..."
-              />
-            </div>
-            <div className="flex items-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity ml-4 flex-shrink-0">
-              <button
-                onClick={() => onScriptChange(row.id, "toggleChapterHeading")}
-                className="p-1 text-gray-400 hover:bg-gray-600 hover:text-white rounded"
-                title="Convert to Chapter Heading"
-              >
-                <Bookmark size={16} />
-              </button>
-              <button
-                onClick={() => onScriptChange(row.id, "add")}
-                className="p-1 hover:bg-gray-600 rounded"
-                title="Add new row below"
-              >
-                <Plus size={16} />
-              </button>
-              <button
-                disabled={index === 0}
-                onClick={() => onScriptChange(row.id, "indent")}
-                className="p-1 hover:bg-gray-600 rounded disabled:opacity-20 disabled:cursor-not-allowed"
-                title="Increase indent"
-              >
-                <ArrowRight size={16} />
-              </button>
-              <button
-                disabled={row.level === 0}
-                onClick={() => onScriptChange(row.id, "outdent")}
-                className="p-1 hover:bg-gray-600 rounded disabled:opacity-20 disabled:cursor-not-allowed"
-                title="Decrease indent"
-              >
-                <CornerDownLeft size={16} />
-              </button>
-              <button
-                onClick={() => onScriptChange(row.id, "delete")}
-                className="p-1 hover:bg-gray-600 rounded text-red-400"
-                title="Delete this row"
-              >
-                <Trash2 size={16} />
-              </button>
-            </div>
-          </div>
-        </td>
-        <td className="px-6 py-4">
-          <div className="w-20 h-16 relative group/image bg-gray-900/50 rounded-md">
-            {row.image && imageUrlCache[row.image] ? (
-              <>
-                <img
-                  src={imageUrlCache[row.image]}
-                  alt={row.image}
-                  className="w-full h-full object-cover rounded-md cursor-pointer"
-                  onClick={() => onImageClick(imageUrlCache[row.image])}
-                />
-                <button
-                  onClick={() => onScriptChange(row.id, "image", null)}
-                  className="absolute -top-1.5 -right-1.5 p-0.5 bg-gray-900/80 rounded-full text-white hover:bg-red-600 transition-colors opacity-0 group-hover/image:opacity-100"
-                  title="Delete image"
-                >
-                  <X size={14} />
-                </button>
-              </>
-            ) : row.image ? (
-              <div className="w-full h-full flex items-center justify-center text-xs text-red-400 text-center p-1">
-                Not Found
-              </div>
-            ) : (
-              <button
-                onClick={() => onUploadClick(row.id)}
-                className="w-full h-full border-2 border-dashed border-gray-600 rounded-md flex flex-col items-center justify-center text-gray-500 hover:bg-gray-700 hover:text-gray-400"
-              >
-                <FileUp size={20} />
-                <span className="text-xs mt-1">Upload</span>
-              </button>
-            )}
-          </div>
-        </td>
-        {/* Skipped rows don't have music/reference cells */}
-        {emotionColumns.map((col) => (
-          <td key={col.key} data-key={col.key} className="px-6 py-4">
-            <div
-              className={
-                showOverlay ? "opacity-0" : "opacity-100 transition-opacity"
-              }
-            >
-              <MetricGraph
-                value={row[col.key] || 0}
-                color={col.color}
-                onValueChange={(newValue) =>
-                  onMetricChange(row.id, col.key, newValue)
-                }
-              />
-            </div>
-          </td>
-        ))}
-      </tr>
-    );
-  };
-
   return (
     <div className="relative">
       {showOverlay && <FullOverlayGraph />}
@@ -1714,26 +1589,21 @@ const TableView = ({
           </thead>
           <tbody className="divide-y divide-gray-700">
             {scriptData.map((row, index) => {
-              let musicSkipped = false;
-              let refSkipped = false;
-              if (musicBlockSkipCounter > 0) {
-                musicBlockSkipCounter--;
-                musicSkipped = true;
-              }
-              if (referenceBlockSkipCounter > 0) {
-                referenceBlockSkipCounter--;
-                refSkipped = true;
-              }
+              const isMusicSkipped = musicBlockSkipCounter > 0;
+              const isRefSkipped = referenceBlockSkipCounter > 0;
 
-              if (row.music && !musicSkipped) {
+              if (musicBlockSkipCounter > 0) musicBlockSkipCounter--;
+              if (referenceBlockSkipCounter > 0) referenceBlockSkipCounter--;
+
+              if (row.music && !isMusicSkipped) {
                 musicBlockSkipCounter = (row.musicDuration || 1) - 1;
               }
-              if (row.referenceVideo && !refSkipped) {
+              if (row.referenceVideo && !isRefSkipped) {
                 referenceBlockSkipCounter =
                   (row.referenceVideoDuration || 1) - 1;
               }
 
-              return renderRow(row, index);
+              return renderRow(row, index, isMusicSkipped, isRefSkipped);
             })}
           </tbody>
         </table>
