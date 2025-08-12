@@ -422,45 +422,75 @@ const EditableMedia = ({ title, link, onSave, type }) => {
 
 const MetricGraph = ({ value, color, onValueChange }) => {
   const graphRef = useRef(null);
-  const handleInteraction = useCallback(
-    (e) => {
-      if (!graphRef.current) return;
-      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-      const { left, width } = graphRef.current.getBoundingClientRect();
-      const newPercentage = Math.max(
-        0,
-        Math.min(100, ((clientX - left) / width) * 100)
-      );
-      onValueChange(Math.round(newPercentage / 10));
-    },
-    [onValueChange]
-  );
+  const [isInteracting, setIsInteracting] = useState(false);
 
-  const percentage = value * 10;
+  const calculateValue = useCallback((clientX) => {
+    if (!graphRef.current) return;
+    const { left, width } = graphRef.current.getBoundingClientRect();
+    // Calculate the percentage of the click/drag position within the component
+    const newPercentage = Math.max(0, Math.min(100, ((clientX - left) / width) * 100));
+    // Convert the percentage to a 0-10 scale and round it
+    const newValue = Math.round(newPercentage / 10);
+    onValueChange(newValue);
+  }, [onValueChange]);
+
+  const handleMouseDown = useCallback((e) => {
+    e.preventDefault();
+    setIsInteracting(true);
+    calculateValue(e.clientX);
+  }, [calculateValue]);
+
+  const handleMouseMove = useCallback((e) => {
+    if (!isInteracting) return;
+    calculateValue(e.clientX);
+  }, [isInteracting, calculateValue]);
+
+  const handleMouseUp = useCallback(() => {
+    setIsInteracting(false);
+  }, []);
+
+  // Add and remove global event listeners for smooth dragging
+  useEffect(() => {
+    if (isInteracting) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    } else {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isInteracting, handleMouseMove, handleMouseUp]);
+  
+  const percentage = (value || 0) * 10;
+
   return (
     <div
-      className="w-full h-10 flex items-center relative group cursor-pointer"
       ref={graphRef}
-      onMouseDown={handleInteraction}
-      onTouchStart={handleInteraction}
+      onMouseDown={handleMouseDown}
+      className="w-full h-10 flex items-center justify-center relative group cursor-pointer bg-gray-700/50 rounded-md overflow-hidden select-none px-2"
     >
-      <div className="w-full h-0.5 bg-gray-600 relative">
-        <div
-          className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full border-2 border-white shadow-lg"
-          style={{
-            left: `calc(${percentage}% - 6px)`,
-            backgroundColor: color,
-            zIndex: 10,
-          }}
-        >
-          <div className="absolute -bottom-7 left-1/2 -translate-x-1/2 px-2 py-1 bg-gray-900 text-white text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-            {value}
-          </div>
-        </div>
-      </div>
+      {/* Background color fill */}
+      <div
+        className="absolute top-0 left-0 h-full transition-all duration-100 ease-linear"
+        style={{
+          width: `${percentage}%`,
+          backgroundColor: color,
+          opacity: 0.6
+        }}
+      />
+      
+      {/* Value text, centered and always visible */}
+      <span className="relative text-white font-bold text-base z-10">
+        {value}
+      </span>
     </div>
   );
 };
+
 
 // --- Modals & Popups ---
 const ConfirmationModal = ({ isOpen, onClose, onConfirm, title, children }) => {
@@ -2167,7 +2197,7 @@ const MetricTimelineChart = ({ data, columns, onSegmentClick }) => {
 };
 
 const WorkflowView = () => {
-  const workflowStyles = `
+    const workflowStyles = `
         .stage-container { display: flex; flex-direction: column; gap: 1.5rem; }
         .stage { background-color: #2a2a2e; border-radius: 12px; padding: 1.5rem; border: 1px solid #444; box-shadow: 0 4px 6px rgba(0,0,0,0.2); }
         .stage-title { font-size: 1.5rem; font-weight: 700; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem; }
@@ -2177,233 +2207,81 @@ const WorkflowView = () => {
         .card-description { font-size: 0.875rem; color: #b0b0b0; }
         .arrow { text-align: center; font-size: 2.5rem; color: #666; margin: 0.5rem 0; }
         .icon { width: 28px; height: 28px; }
-        .loop-icon { animation: spin 8s linear infinite; }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .sub-stage { border-left: 2px solid #555; padding-left: 1.5rem; margin-top: 1.5rem; }
+        .sub-stage-title { font-size: 1.2rem; font-weight: 600; margin-bottom: 1rem; color: #e0e0e0; }
     `;
 
-  return (
-    <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-lg overflow-hidden">
-      <style>{workflowStyles}</style>
-      <div className="p-6">
-        <header className="text-center mb-12">
-          <h1 className="text-3xl md:text-4xl font-bold text-white">
-            Personal Animation Workflow
-          </h1>
-          <p className="text-lg text-gray-400 mt-2">
-            A flexible, iterative visual guide for solo creators.
-          </p>
-        </header>
-        <div className="stage-container">
-          <div className="stage">
-            <h2 className="stage-title" style={{ color: "#3b82f6" }}>
-              <svg
-                className="icon"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth="1.5"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h6.375a.625.625 0 0 1 .625.625v3.75a.625.625 0 0 1-.625.625H9v-5Zm0 6.25h6.375a.625.625 0 0 1 .625.625v3.75a.625.625 0 0 1-.625.625H9v-5Z"
-                />
-              </svg>
-              0. Project Foundation
-            </h2>
-            <div className="card-grid">
-              <div className="card" style={{ borderColor: "#3b82f6" }}>
-                <h3 className="card-title">Project Initialization</h3>
-                <p className="card-description">
-                  Set up a clear folder structure and version control.
-                </p>
-              </div>
-              <div className="card" style={{ borderColor: "#3b82f6" }}>
-                <h3 className="card-title">Task System Setup</h3>
-                <p className="card-description">
-                  Set up a board in Jira/Trello, define tags.
-                </p>
-              </div>
+    return (
+        <div className="bg-gray-800 border border-gray-700 rounded-lg shadow-lg overflow-hidden">
+            <style>{workflowStyles}</style>
+            <div className="p-6">
+                <header className="text-center mb-12">
+                    <h1 className="text-3xl md:text-4xl font-bold text-white">專業單人專案工作流程 (修訂版)</h1>
+                    <p className="text-lg text-gray-400 mt-2">一個為獨立創作者設計的、注重視覺開發的生產管線。</p>
+                </header>
+                <div className="stage-container">
+                    {/* --- STAGE 1: Concept & Blueprint --- */}
+                    <div className="stage">
+                        <h2 className="stage-title" style={{ color: '#3b82f6' }}><svg className="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" /></svg>1. 構思與藍圖 (Concept & Blueprint)</h2>
+                        <div className="card-grid">
+                            <div className="card" style={{ borderColor: '#3b82f6' }}><h3 className="card-title">核心想法 & 腳本</h3><p className="card-description">確定故事的核心和文字內容。</p></div>
+                            <div className="card" style={{ borderColor: '#3b82f6' }}><h3 className="card-title">參考與氛圍</h3><p className="card-description">收集視覺風格、色彩和音樂/音效的參考，確立專案的整體基調。</p></div>
+                            <div className="card" style={{ borderColor: '#3b82f6' }}><h3 className="card-title">故事板 & 指標分析</h3><p className="card-description">將腳本視覺化，拆解成具體的鏡頭，並使用指標工具分析每個片段的潛力。</p></div>
+                        </div>
+                    </div>
+                    <div className="arrow">↓</div>
+                    {/* --- STAGE 2: Look Dev & Shot Production --- */}
+                    <div className="stage">
+                        <h2 className="stage-title" style={{ color: '#f97316' }}><svg className="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" /></svg>2. 視覺開發與鏡頭製作 (Look Dev & Shot Production)</h2>
+                        
+                        {/* --- SUB-STAGE 1: Scene Setup & Look Dev --- */}
+                        <div className="sub-stage">
+                            <h3 className="sub-stage-title">1. 場景搭建與視覺基調 (Scene Setup & Look Dev)</h3>
+                            <div className="card-grid">
+                               <div className="card" style={{ borderColor: '#f97316' }}><h3 className="card-title">初步資產與佈景</h3><p className="card-description">獲取或製作「及格」水平的關鍵資產，搭建基礎場景以供測試。</p></div>
+                               <div className="card" style={{ borderColor: '#f97316' }}><h3 className="card-title">關鍵幀光影色彩</h3><p className="card-description">使用初步資產，跑通 UE -> Davinci 流程，確立該場景的最終視覺風格「聖經」。</p></div>
+                            </div>
+                        </div>
+                        <div className="arrow">↓</div>
+
+                        {/* --- SUB-STAGE 2: Shot Production --- */}
+                        <div className="sub-stage">
+                             <h3 className="sub-stage-title">2. 鏡頭量產 (Shot Production)</h3>
+                             <div className="card-grid">
+                                <div className="card" style={{ borderColor: '#eab308' }}><h3 className="card-title">完善資產與細節</h3><p className="card-description">基於已確立的風格，完善所有模型、材質和場景細節。</p></div>
+                                <div className="card" style={{ borderColor: '#eab308' }}><h3 className="card-title">動畫與攝影機</h3><p className="card-description">製作角色、物體和攝影機的動態。</p></div>
+                                <div className="card" style={{ borderColor: '#eab308' }}><h3 className="card-title">最終光影與特效</h3><p className="card-description">基於已確立的風格，為所有鏡頭打光並添加特效。</p></div>
+                                <div className="card" style={{ borderColor: '#eab308' }}><h3 className="card-title">完整渲染</h3><p className="card-description">輸出整個鏡頭的圖像序列。</p></div>
+                             </div>
+                        </div>
+                         <div className="arrow">↓</div>
+
+                        {/* --- SUB-STAGE 3: Preview & Sound --- */}
+                        <div className="sub-stage">
+                             <h3 className="sub-stage-title">3. 預覽與音效 (Preview & Sound)</h3>
+                             <div className="card-grid">
+                                <div className="card" style={{ borderColor: '#84cc16' }}><h3 className="card-title">檢查節奏</h3><p className="card-description">將渲染序列快速合成，並配上臨時音效或音樂，以檢查節奏和整體感覺。如有問題，可隨時返回上一步微調。</p></div>
+                             </div>
+                        </div>
+                    </div>
+                    <div className="arrow">↓</div>
+
+                    {/* --- STAGE 3: Final Polish --- */}
+                    <div className="stage">
+                        <h2 className="stage-title" style={{ color: '#ec4899' }}><svg className="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z" /></svg>3. 最終整合 (Final Polish)</h2>
+                        <div className="card-grid">
+                            <div className="card" style={{ borderColor: '#ec4899' }}><h3 className="card-title">最終剪輯 & 調色</h3><p className="card-description">將所有渲染好的片段組合起來，並基於 Look Dev 階段的標準統一整體色調。</p></div>
+                            <div className="card" style={{ borderColor: '#ec4899' }}><h3 className="card-title">音效設計 & 混音</h3><p className="card-description">完成所有聲音的細節和混合。</p></div>
+                            <div className="card" style={{ borderColor: '#ec4899' }}><h3 className="card-title">最終輸出</h3><p className="card-description">匯出最終的影片成品。</p></div>
+                        </div>
+                    </div>
+                </div>
             </div>
-          </div>
-          <div className="arrow">↓</div>
-          <div className="stage">
-            <h2 className="stage-title" style={{ color: "#10b981" }}>
-              <svg
-                className="icon"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth="1.5"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.311a7.5 7.5 0 0 1-7.5 0c-1.421-.455-2.5-1.683-2.75-3.182S4.5 14.19 4.5 13.5v-1.5c0-.69.055-1.379.168-2.042M12 18V10.5m0 7.5H8.25m3.75 0H15.75m-7.5 0H5.625m7.5 0H18.375m-7.5 0h.008v.015h-.008V18Zm-7.5 0h.008v.015h-.008V18Zm7.5 0h.008v.015h-.008V18Zm7.5 0h.008v.015h-.008V18Z"
-                />
-              </svg>
-              1. Pre-Production
-            </h2>
-            <div className="card-grid">
-              <div className="card" style={{ borderColor: "#10b981" }}>
-                <h3 className="card-title">Core Concept & Script</h3>
-                <p className="card-description">
-                  Define the core story and text.
-                </p>
-              </div>
-              <div className="card" style={{ borderColor: "#10b981" }}>
-                <h3 className="card-title">Script Analysis & Metrics</h3>
-                <p className="card-description">
-                  Use the metric table to define the viral potential of each
-                  scene.
-                </p>
-              </div>
-              <div className="card" style={{ borderColor: "#10b981" }}>
-                <h3 className="card-title">Visual References & Moodboard</h3>
-                <p className="card-description">
-                  Gather images, colors, and lighting references to establish
-                  the mood.
-                </p>
-              </div>
-              <div className="card" style={{ borderColor: "#10b981" }}>
-                <h3 className="card-title">Music & Sound Exploration</h3>
-                <p className="card-description">
-                  Collect reference music and sound effects to set the project's
-                  auditory tone.
-                </p>
-              </div>
-              <div className="card" style={{ borderColor: "#10b981" }}>
-                <h3 className="card-title">Storyboard & Animatic</h3>
-                <p className="card-description">
-                  Sketch out shots to define composition, pacing, and meaning.
-                </p>
-              </div>
-              <div className="card" style={{ borderColor: "#10b981" }}>
-                <h3 className="card-title">Asset List & R&D</h3>
-                <p className="card-description">
-                  Break down required 3D assets and test key visual effects.
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="arrow">↓</div>
-          <div className="stage">
-            <h2 className="stage-title" style={{ color: "#f97316" }}>
-              <svg
-                className="icon loop-icon"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth="1.5"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 11.667 0l3.181-3.183m-4.991-2.691v4.992h-4.992m0 0-3.181-3.183a8.25 8.25 0 0 1 11.667 0l3.181 3.183"
-                />
-              </svg>
-              2. Production (Iterative per Shot)
-            </h2>
-            <div className="card-grid">
-              <div className="card" style={{ borderColor: "#f97316" }}>
-                <h3 className="card-title">Asset Acquisition & Integration</h3>
-                <p className="card-description">
-                  Get assets from online libraries (Fab, Sketchfab) or create
-                  them.
-                </p>
-              </div>
-              <div className="card" style={{ borderColor: "#f97316" }}>
-                <h3 className="card-title">Final Music & Sound</h3>
-                <p className="card-description">
-                  Based on the animatic, select and finalize the music for the
-                  current shot.
-                </p>
-              </div>
-              <div className="card" style={{ borderColor: "#f97316" }}>
-                <h3 className="card-title">Layout & Blocking</h3>
-                <p className="card-description">
-                  Construct the scene and set up camera positions.
-                </p>
-              </div>
-              <div className="card" style={{ borderColor: "#f97316" }}>
-                <h3 className="card-title">Lighting & Color Draft</h3>
-                <p className="card-description">
-                  Create a color palette and set up key and mood lighting based
-                  on references.
-                </p>
-              </div>
-              <div className="card" style={{ borderColor: "#f97316" }}>
-                <h3 className="card-title">Animation</h3>
-                <p className="card-description">
-                  Create movement for characters, objects, and the camera.
-                </p>
-              </div>
-              <div className="card" style={{ borderColor: "#f97316" }}>
-                <h3 className="card-title">Visual Effects (VFX)</h3>
-                <p className="card-description">
-                  Create or integrate necessary visual effects.
-                </p>
-              </div>
-              <div className="card" style={{ borderColor: "#f97316" }}>
-                <h3 className="card-title">Rendering</h3>
-                <p className="card-description">
-                  Output image sequences or video clips.
-                </p>
-              </div>
-            </div>
-          </div>
-          <div className="arrow">↓</div>
-          <div className="stage">
-            <h2 className="stage-title" style={{ color: "#ec4899" }}>
-              <svg
-                className="icon"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                strokeWidth="1.5"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 0 0-2.456 2.456Z"
-                />
-              </svg>
-              3. Post-Production
-            </h2>
-            <div className="card-grid">
-              <div className="card" style={{ borderColor: "#ec4899" }}>
-                <h3 className="card-title">Editing</h3>
-                <p className="card-description">Assemble the rendered shots.</p>
-              </div>
-              <div className="card" style={{ borderColor: "#ec4899" }}>
-                <h3 className="card-title">Color Grading</h3>
-                <p className="card-description">
-                  Unify the color tone, enhance mood and style.
-                </p>
-              </div>
-              <div className="card" style={{ borderColor: "#ec4899" }}>
-                <h3 className="card-title">Sound Design & Mixing</h3>
-                <p className="card-description">
-                  Add ambient sounds, foley, and mix the audio tracks.
-                </p>
-              </div>
-              <div className="card" style={{ borderColor: "#ec4899" }}>
-                <h3 className="card-title">Final Touches & Export</h3>
-                <p className="card-description">
-                  Make final tweaks and export the final video.
-                </p>
-              </div>
-            </div>
-          </div>
         </div>
-      </div>
-    </div>
-  );
+    );
 };
+
+
 
 const AssetView = ({
   scriptData,
