@@ -48,7 +48,7 @@
     {
       "id": "scene1-part1",
       "level": 1,
-      "segment": "1.1 [建立鏡頭] 岩木山的遠景，畫面靜謐。突然，一陣引擎轟鳴聲從遠處傳來，劃破寧靜，鏡頭隨聲音移動。",
+      "segment": "1.1 [建立鏡頭] 岩木山的遠景，畫面靜謐。突然，一陣引擎轟鳴聲從遠處傳來，劃破寧靜，鏡頭隨聲音移動。(1s)",
       "image": "ikawi.png",
       "music": "",
       "musicTitle": "",
@@ -66,7 +66,7 @@
     {
       "id": "scene1-part2",
       "level": 1,
-      "segment": "1.2 [蒙太奇] AE86在破曉前的山路高速漂移，展現貼護欄、水杯不灑等神技。",
+      "segment": "1.2 [蒙太奇] AE86在破曉前的山路高速漂移，展現貼護欄、水杯不灑等神技。7~8s",
       "image": "1.2.01.png",
       "music": "",
       "musicTitle": "",
@@ -83,7 +83,7 @@
     {
       "id": "8b77d566-f240-4f63-8ab9-1f63a5a0782d",
       "level": 2,
-      "segment": "cont紧贴护栏漂过弯",
+      "segment": "cont紧贴护栏漂过弯 (2s)",
       "image": "close_2_border.png",
       "music": "",
       "musicTitle": "",
@@ -102,7 +102,7 @@
     {
       "id": "200b583f-1208-4b95-870b-d34cbfd4da01",
       "level": 2,
-      "segment": "cont水在翻腾但没漏出来",
+      "segment": "cont水在翻腾但没漏出来 (2s)",
       "image": "watercup.png",
       "music": "",
       "musicTitle": "",
@@ -120,9 +120,29 @@
       "referenceVideoDuration": 1
     },
     {
+      "id": "21edba9f-0f8a-47d3-aaf9-6209559727e6",
+      "level": 2,
+      "segment": "cont汽车继续漂移 (1s)",
+      "image": null,
+      "music": "",
+      "musicTitle": "",
+      "musicDuration": 1,
+      "referenceVideo": "",
+      "referenceVideoTitle": "",
+      "referenceVideoDuration": 1,
+      "shotSize": "",
+      "shotType": "",
+      "isChapterHeading": false,
+      "coolFactor": 0,
+      "tension": 0,
+      "hypeFactor": 0,
+      "resonance": 0,
+      "boredom": 0
+    },
+    {
       "id": "f72bc40c-bd78-4c63-a129-83a1a9664d22",
       "level": 2,
-      "segment": "cont*豆腐特写",
+      "segment": "cont*豆腐特写 (2s)",
       "image": "Tofu_closeup.png",
       "music": "",
       "musicTitle": "",
