@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from "react";
+import Image from "next/image";
 import { ImageIcon, Music, Video, Trash2 } from "lucide-react";
 import { generateSegmentNumbers } from "../utils/data";
 
@@ -22,11 +23,17 @@ type AssetViewProps = {
   onScriptChange: (
     id: string | null,
     action: string,
-    value?: any
+    value?: Map<AssetType, Set<string>>
   ) => void;
 };
 
 type AssetType = "image" | "music" | "reference";
+type LinkAssetInfo = { title?: string; usedBy: string[] };
+type AssetMapByType = {
+  image: Map<string, string[]>;
+  music: Map<string, LinkAssetInfo>;
+  reference: Map<string, LinkAssetInfo>;
+};
 
 export const AssetView: React.FC<AssetViewProps> = ({
   scriptData,
@@ -40,14 +47,8 @@ export const AssetView: React.FC<AssetViewProps> = ({
 
   const assets = useMemo(() => {
     const imageAssets = new Map<string, string[]>();
-    const musicAssets = new Map<
-      string,
-      { title: string | undefined; usedBy: string[] }
-    >();
-    const referenceAssets = new Map<
-      string,
-      { title: string | undefined; usedBy: string[] }
-    >();
+    const musicAssets = new Map<string, LinkAssetInfo>();
+    const referenceAssets = new Map<string, LinkAssetInfo>();
 
     scriptData.forEach((row) => {
       if (row.image) {
@@ -70,6 +71,11 @@ export const AssetView: React.FC<AssetViewProps> = ({
     });
     return { imageAssets, musicAssets, referenceAssets };
   }, [scriptData]);
+
+  const segmentNumbers = useMemo(
+    () => generateSegmentNumbers(scriptData),
+    [scriptData]
+  );
 
   const handleSelect = (type: AssetType, key: string) => {
     const newSelection = new Map(selectedAssets);
@@ -102,18 +108,18 @@ export const AssetView: React.FC<AssetViewProps> = ({
     setSelectedAssets(new Map());
   };
 
-  const handleDeleteUnused = (type: AssetType) => {
+  const handleDeleteUnused = (assetType: AssetType) => {
     alert(
-      "This feature would delete unused assets from a central library. Functionality not fully implemented in this demo."
+      `This feature would delete unused ${assetType} assets from a central library. Functionality not fully implemented in this demo.`
     );
     setSelectedAssets(new Map());
   };
 
-  const renderAssetSection = (
+  const renderAssetSection = <T extends AssetType>(
     title: string,
     icon: React.ReactNode,
-    assetMap: Map<string, any>,
-    type: AssetType
+    assetMap: AssetMapByType[T],
+    type: T
   ) => {
     const keys = Array.from(assetMap.keys());
     const selectedCount = selectedAssets.get(type)?.size || 0;
@@ -154,9 +160,21 @@ export const AssetView: React.FC<AssetViewProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {keys.map((key) => {
               const isSelected = selectedAssets.get(type)?.has(key) || false;
-              const info = assetMap.get(key);
-              const usedBy = Array.isArray(info) ? info : info.usedBy;
-              const assetTitle = Array.isArray(info) ? key : info.title;
+              const info = assetMap.get(key)!;
+              const imageSrc = type === "image" ? imageUrlCache[key] : null;
+
+              let usedBy: string[] = [];
+              let assetTitle = key;
+              let subLabel = key;
+
+              if (type === "image") {
+                usedBy = info as string[];
+              } else {
+                const linkInfo = info as LinkAssetInfo;
+                usedBy = linkInfo.usedBy;
+                assetTitle = linkInfo.title || key;
+                subLabel = "Link";
+              }
 
               return (
                 <div
@@ -176,11 +194,14 @@ export const AssetView: React.FC<AssetViewProps> = ({
                     />
                     {type === "image" ? (
                       <div className="w-16 h-16 bg-black rounded-md flex-shrink-0">
-                        {imageUrlCache[key] ? (
-                          <img
-                            src={imageUrlCache[key] || ""}
+                        {imageSrc ? (
+                          <Image
+                            src={imageSrc}
                             alt={key}
-                            className="w-full h-full object-cover"
+                            width={64}
+                            height={64}
+                            className="w-full h-full object-cover rounded-md"
+                            unoptimized
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-xs text-red-500">
@@ -207,8 +228,8 @@ export const AssetView: React.FC<AssetViewProps> = ({
                       >
                         {assetTitle}
                       </p>
-                      <p className="text-xs text-gray-400 truncate" title={key}>
-                        {type === "image" ? key : "Link"}
+                      <p className="text-xs text-gray-400 truncate" title={subLabel}>
+                        {subLabel}
                       </p>
                     </div>
                   </div>
@@ -219,10 +240,7 @@ export const AssetView: React.FC<AssetViewProps> = ({
                     {usedBy.length > 0 ? (
                       <p className="text-sm text-gray-300 truncate">
                         {usedBy
-                          .map(
-                            (id: string) =>
-                              generateSegmentNumbers(scriptData)[id] || "?"
-                          )
+                          .map((id) => segmentNumbers[id] || "?")
                           .join(", ")}
                       </p>
                     ) : (
