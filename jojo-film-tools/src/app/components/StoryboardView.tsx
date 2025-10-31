@@ -347,6 +347,36 @@ export const StoryboardView: React.FC<StoryboardViewProps> = ({
         }`}
       >
         {scriptData.map((item, index) => {
+          if (item.isChapterHeading) {
+            return (
+              <div
+                key={item.id}
+                className="col-span-full bg-gray-900/70 border border-gray-700 rounded-lg p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+              >
+                <EditableSegment
+                  value={item.segment}
+                  onChange={(newText) => onScriptChange(item.id, "segment", newText)}
+                  placeholder="输入章节标题..."
+                  isHeading={true}
+                />
+                <div className="flex items-center gap-2 self-start sm:self-center">
+                  <button
+                    onClick={() => onScriptChange(item.id, "toggleChapterHeading")}
+                    className="px-3 py-1.5 text-sm bg-gray-800 text-amber-400 rounded-md hover:bg-gray-700"
+                  >
+                    转换为镜头
+                  </button>
+                  <button
+                    onClick={() => onScriptChange(item.id, "add")}
+                    className="px-3 py-1.5 text-sm bg-amber-500 text-black font-medium rounded-md hover:bg-amber-400"
+                  >
+                    + 新建镜头
+                  </button>
+                </div>
+              </div>
+            );
+          }
+
           const musicStatus = getMusicStatus(index);
           const referenceStatus = getReferenceStatus(index);
           const musicItem = scriptData.find(

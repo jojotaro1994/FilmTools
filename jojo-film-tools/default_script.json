@@ -2,5 +2,44 @@
   "projectSettings": {
     "imageFolderName": "Images"
   },
-  "scriptData": []
+  "scriptData": [
+    {
+      "id": "8ecc4ec8-2c95-44fc-b25e-5aebdc9a4021",
+      "level": 0,
+      "segment": "转子大赛开始",
+      "image": null,
+      "music": "",
+      "musicTitle": "",
+      "musicDuration": 1,
+      "referenceVideo": "",
+      "referenceVideoTitle": "",
+      "referenceVideoDuration": 1,
+      "shotSize": "",
+      "shotType": "",
+      "dialogues": [],
+      "mainCharacters": "",
+      "cameraMotion": "",
+      "durationSeconds": null,
+      "isChapterHeading": true
+    },
+    {
+      "id": "f631e484-0550-4517-9106-516987f6a08a",
+      "level": 0,
+      "segment": "转子引擎高速特写",
+      "image": "rotary_engine.png",
+      "music": "",
+      "musicTitle": "",
+      "musicDuration": 1,
+      "referenceVideo": "https://www.bilibili.com/video/BV1jRgazwEes?t=234.3",
+      "referenceVideoTitle": "启介vs北条武",
+      "referenceVideoDuration": 1,
+      "shotSize": "",
+      "shotType": "",
+      "dialogues": [],
+      "mainCharacters": "",
+      "cameraMotion": "",
+      "durationSeconds": null,
+      "isChapterHeading": false
+    }
+  ]
 }
